@@ -1,0 +1,26 @@
+# Formatting every file in the repository follows (the code style is first-party
+# Omarchy QML: two spaces, no tabs, lines up to 110 columns).
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 110
+
+# Prose wraps where the sentence does, and tables do not wrap at all.
+[*.md]
+max_line_length = off
+
+# A JSON string cannot be wrapped, and the manifest's description is one.
+[*.json]
+max_line_length = off
+
+# Recorded and hand-written test data keeps the shape of what it imitates.
+[tests/fixtures/**]
+max_line_length = off
+insert_final_newline = unset
+trim_trailing_whitespace = unset

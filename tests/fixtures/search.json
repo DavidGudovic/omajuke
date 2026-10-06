@@ -1,0 +1,485 @@
+{
+  "id": "synthetic query",
+  "title": "synthetic query",
+  "_type": "playlist",
+  "entries": [
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "AAAAAAAAAAA",
+      "url": "https://www.youtube.com/watch?v=AAAAAAAAAAA",
+      "title": "Synthetic track one",
+      "description": "Synthetic description. Never read.",
+      "duration": 213,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Channel",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Channel",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/AAAAAAAAAAA/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 1000,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "BBBBBBBBBBB",
+      "url": "https://www.youtube.com/watch?v=BBBBBBBBBBB",
+      "title": "  Second \u202etrack\u202c \u200bwith\u00a0marks\u0007\n and a line break  ",
+      "description": "Synthetic description. Never read.",
+      "duration": 187.6,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Channel",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Channel",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/BBBBBBBBBBB/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 1000,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "CCCCCCCCCCC",
+      "url": "https://www.youtube.com/watch?v=CCCCCCCCCCC",
+      "title": "Synthetic live stream",
+      "description": "Synthetic description. Never read.",
+      "duration": null,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Channel",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Channel",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/CCCCCCCCCCC/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "live_status": "is_live",
+      "channel_is_verified": null,
+      "concurrent_view_count": 42
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "DDDDDDDDDDD",
+      "url": "https://www.youtube.com/watch?v=DDDDDDDDDDD",
+      "title": "Synthetic stream of unknown length",
+      "description": "Synthetic description. Never read.",
+      "duration": null,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Channel",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Channel",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/DDDDDDDDDDD/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 1000,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "EEEEEEEEEEE",
+      "url": "https://www.youtube.com/watch?v=EEEEEEEEEEE",
+      "title": "Synthetic premiere, not started",
+      "description": "Synthetic description. Never read.",
+      "duration": null,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Channel",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Channel",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/EEEEEEEEEEE/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 1000,
+      "live_status": "is_upcoming",
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "AAAAAAAAAAA",
+      "url": "https://www.youtube.com/watch?v=AAAAAAAAAAA",
+      "title": "Synthetic track one, listed twice",
+      "description": "Synthetic description. Never read.",
+      "duration": 213,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Channel",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Channel",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/AAAAAAAAAAA/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 1000,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    null,
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "FFFFFFFFFFF",
+      "url": "https://www.youtube.com/watch?v=FFFFFFFFFFF",
+      "title": "Synthetic track without a channel name",
+      "description": "Synthetic description. Never read.",
+      "duration": 61,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": null,
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Uploader",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/FFFFFFFFFFF/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 1000,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "GGGGGGGGGGG",
+      "url": "https://www.youtube.com/watch?v=GGGGGGGGGGG",
+      "title": "<img src=\"http://127.0.0.1:9/x\"> & <b>markup</b>",
+      "description": "Synthetic description. Never read.",
+      "duration": 0,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Channel",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Channel",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/GGGGGGGGGGG/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 1000,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "HHHHHHHHHHH",
+      "url": "https://www.youtube.com/watch?v=HHHHHHHHHHH",
+      "title": "\u65e5\u672c\u8a9e \ud83c\udfb5 caf\u00e9 \ud83d",
+      "description": "Synthetic description. Never read.",
+      "duration": 3600,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "\u041a\u0430\u043d\u0430\u043b",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Channel",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/HHHHHHHHHHH/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 1000,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "IIIIIIIIIII",
+      "url": "https://www.youtube.com/watch?v=IIIIIIIIIII",
+      "title": "long title long title long title long title long title long title long title long title long title long title long title long title long title long title long title long title long title long title long title long title long title long title long title long title long title long title long title long title long title long title long title ",
+      "description": "Synthetic description. Never read.",
+      "duration": 5400,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Channel",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Channel",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/IIIIIIIIIII/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 1000,
+      "live_status": "was_live",
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "JJJJJJJJJJJ",
+      "url": "https://www.youtube.com/watch?v=JJJJJJJJJJJ",
+      "title": 12345,
+      "description": "Synthetic description. Never read.",
+      "duration": 213,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Channel",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Channel",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/JJJJJJJJJJJ/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 1000,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "KKKKKKKKKKK",
+      "url": "https://www.youtube.com/watch?v=KKKKKKKKKKK",
+      "description": "Synthetic description. Never read.",
+      "duration": 213,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Channel",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Channel",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/KKKKKKKKKKK/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 1000,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "short",
+      "url": "https://www.youtube.com/watch?v=short",
+      "title": "Synthetic entry with a short id",
+      "description": "Synthetic description. Never read.",
+      "duration": 213,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Channel",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Channel",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/short/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 1000,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "LLLLLLLLLLLL",
+      "url": "https://www.youtube.com/watch?v=LLLLLLLLLLLL",
+      "title": "Synthetic entry with a long id",
+      "description": "Synthetic description. Never read.",
+      "duration": 213,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Channel",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Channel",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/LLLLLLLLLLLL/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 1000,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    "LLLLLLLLLLL",
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "MMMMMMMMMMM",
+      "url": "https://www.youtube.com/watch?v=MMMMMMMMMMM",
+      "title": "\u200b\u200e \n",
+      "description": "Synthetic description. Never read.",
+      "duration": 213,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Channel",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Channel",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/MMMMMMMMMMM/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 1000,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "NNNNNNNNNNN",
+      "url": "https://www.youtube.com/watch?v=NNNNNNNNNNN",
+      "title": "Synthetic track longer than two days",
+      "description": "Synthetic description. Never read.",
+      "duration": 172801,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Channel",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Channel",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/NNNNNNNNNNN/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 1000,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "constructor",
+      "url": "https://www.youtube.com/watch?v=constructor",
+      "title": "Synthetic track, id spelled like a member name",
+      "description": "Synthetic description. Never read.",
+      "duration": 213,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": 7,
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": null,
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/constructor/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 1000,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "--no-config",
+      "url": "https://www.youtube.com/watch?v=--no-config",
+      "title": "Synthetic track, id spelled like an option",
+      "description": "Synthetic description. Never read.",
+      "duration": "213",
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Channel",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Channel",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/--no-config/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 1000,
+      "live_status": null,
+      "channel_is_verified": null
+    }
+  ],
+  "webpage_url": "ytsearch20:synthetic query",
+  "original_url": "ytsearch20:synthetic query",
+  "webpage_url_basename": "ytsearch20:synthetic query",
+  "webpage_url_domain": null,
+  "extractor": "youtube:search",
+  "extractor_key": "YoutubeSearch",
+  "release_year": null,
+  "playlist_count": 20,
+  "requested_entries": null
+}

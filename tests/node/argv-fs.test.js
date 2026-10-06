@@ -1,0 +1,215 @@
+"use strict"
+// Tests for the file-operation command lines of lib/Sh.js: each builder
+// returns exactly the documented array, starts with an absolute tool, puts
+// nothing variable anywhere but in its documented slots, and has no way to
+// take a video id. Paths come from lib/Paths.js as they do in the plugin.
+var test = require("node:test")
+var assert = require("node:assert")
+var load = require("./load.js")
+
+var Sh = load.lib("Sh")
+var Const = load.lib("Const")
+var Paths = load.lib("Paths")
+
+var TOOLS = Const.TOOLS
+var R = "/run/user/1000/omajuke"
+var S = "/home/user/.local/state/omajuke"
+
+var paths = Paths.resolve({
+  XDG_RUNTIME_DIR: "/run/user/1000", XDG_STATE_HOME: null, XDG_DATA_HOME: null, HOME: "/home/user"
+})
+
+// Tool paths no real machine has, to see where each tool lands in an argv.
+function markedTools() {
+  var marked = {}
+  Object.keys(TOOLS).forEach(function(name) { marked[name] = "/marked/" + name })
+  return marked
+}
+
+// Every builder with ordinary arguments, for the checks that hold for all.
+function everyArgv(tools, p) {
+  return {
+    prepareArgv: Sh.prepareArgv(tools, p),
+    writeArgv: Sh.writeArgv(tools, p.stateFile),
+    readArgv: Sh.readArgv(tools, p.stateFile, Const.LIMITS.stateBytes),
+    removeArgv: Sh.removeArgv(tools, [Paths.infoFile(p, 1), Paths.thumbFile(p, 2)]),
+    purgeArgv: Sh.purgeArgv(tools, p.infoDir),
+    cleanupArgv: Sh.cleanupArgv(tools, p)
+  }
+}
+
+test("the paths used here resolve to the usual places", function() {
+  assert.strictEqual(paths.ok, true)
+  assert.strictEqual(paths.runtimeDir, R)
+  assert.strictEqual(paths.stateDir, S)
+})
+
+test("prepareArgv is the constant script with its six parameters", function() {
+  assert.deepStrictEqual(Sh.prepareArgv(TOOLS, paths), [
+    "/usr/bin/sh", "-c", Sh.PREPARE, "omajuke-prepare",
+    R, S, "/usr/lib/mpv-mpris/mpris.so", "/run/user/1000", "/usr/bin/mpv", "/usr/bin/yt-dlp"
+  ])
+})
+
+test("writeArgv is the constant script and the target", function() {
+  assert.deepStrictEqual(Sh.writeArgv(TOOLS, S + "/state.json"),
+    ["/usr/bin/sh", "-c", Sh.PRIVATE_WRITE, "omajuke-write", S + "/state.json"])
+  assert.deepStrictEqual(Sh.writeArgv(TOOLS, Paths.infoFile(paths, 12)),
+    ["/usr/bin/sh", "-c", Sh.PRIVATE_WRITE, "omajuke-write", R + "/info/12.json"])
+})
+
+test("readArgv asks head for one byte more than the cap", function() {
+  assert.deepStrictEqual(Sh.readArgv(TOOLS, S + "/state.json", 1048576),
+    ["/usr/bin/head", "-c", "1048577", "--", S + "/state.json"])
+  assert.deepStrictEqual(Sh.readArgv(TOOLS, S + "/state.json", 1),
+    ["/usr/bin/head", "-c", "2", "--", S + "/state.json"])
+})
+
+test("removeArgv is rm -f, an end of options, and the files", function() {
+  var files = [R + "/info/1.json", R + "/thumbs/2.jpg"]
+  assert.deepStrictEqual(Sh.removeArgv(TOOLS, files), ["/usr/bin/rm", "-f", "--"].concat(files))
+  assert.deepStrictEqual(files, [R + "/info/1.json", R + "/thumbs/2.jpg"], "the given list is not changed")
+  assert.deepStrictEqual(Sh.removeArgv(TOOLS, []), ["/usr/bin/rm", "-f", "--"])
+  assert.ok(Sh.removeArgv(TOOLS, files).indexOf("-r") === -1, "never recursive")
+  assert.ok(Sh.removeArgv(TOOLS, files).indexOf("-rf") === -1, "never recursive")
+})
+
+test("purgeArgv deletes the files directly inside one directory", function() {
+  assert.deepStrictEqual(Sh.purgeArgv(TOOLS, R + "/thumbs"),
+    ["/usr/bin/find", R + "/thumbs", "-mindepth", "1", "-maxdepth", "1", "-type", "f", "-delete"])
+})
+
+test("cleanupArgv removes exactly the seven runtime paths, bounded by timeout alone", function() {
+  assert.deepStrictEqual(Sh.cleanupArgv(TOOLS, paths), [
+    "/usr/bin/timeout", "-k", "2", "5", "/usr/bin/rm", "-rf", "--",
+    R + "/mpv.sock", R + "/info", R + "/thumbs", R + "/jar", R + "/signin", R + "/ytcache", R + "/deno"
+  ])
+  var argv = Sh.cleanupArgv(TOOLS, paths)
+  assert.strictEqual(argv[2], String(Const.TIMEOUTS.killGraceSec))
+  assert.strictEqual(argv[3], String(Const.TIMEOUTS.local))
+  // It must outlive the shell that started it, so nothing ties it to one.
+  assert.ok(argv.indexOf("--pdeathsig") === -1 && argv.indexOf(TOOLS.setpriv) === -1)
+  var removed = argv.slice(7)
+  removed.forEach(function(target) {
+    assert.ok(target.indexOf(R + "/") === 0 && target.length > R.length + 1, target + " is below our dir")
+    assert.ok(!/\/$/.test(target), target + " has no trailing slash")
+    assert.ok(target.indexOf("..") === -1 && target.indexOf("*") === -1, target)
+  })
+  assert.ok(removed.indexOf(R) === -1, "the runtime dir itself stays")
+  assert.ok(removed.every(function(target) { return target.indexOf(S) !== 0 }), "nothing of the state dir")
+})
+
+test("every builder returns an array of strings whose first element is an absolute tool", function() {
+  var all = everyArgv(TOOLS, paths)
+  Object.keys(all).forEach(function(name) {
+    var argv = all[name]
+    assert.ok(Array.isArray(argv), name)
+    argv.forEach(function(part, i) { assert.strictEqual(typeof part, "string", name + "[" + i + "]") })
+    assert.match(argv[0], /^\/usr\/bin\/[a-z]+$/, name)
+  })
+})
+
+test("tools come from the table that was passed in, each in its place", function() {
+  var all = everyArgv(markedTools(), paths)
+  var toolsOf = function(argv) {
+    return argv.filter(function(part) { return part.indexOf("/marked/") === 0 })
+  }
+  assert.deepStrictEqual(toolsOf(all.prepareArgv), ["/marked/sh", "/marked/mpv", "/marked/ytdlp"])
+  assert.deepStrictEqual(toolsOf(all.writeArgv), ["/marked/sh"])
+  assert.deepStrictEqual(toolsOf(all.readArgv), ["/marked/head"])
+  assert.deepStrictEqual(toolsOf(all.removeArgv), ["/marked/rm"])
+  assert.deepStrictEqual(toolsOf(all.purgeArgv), ["/marked/find"])
+  assert.deepStrictEqual(toolsOf(all.cleanupArgv), ["/marked/timeout", "/marked/rm"])
+  Object.keys(all).forEach(function(name) {
+    assert.ok(!/\/usr\/bin\/(sh|head|rm|find|timeout|mpv|yt-dlp)"/.test(JSON.stringify(all[name])),
+      name + " takes no tool from anywhere else")
+  })
+})
+
+test("nothing varies but the documented slots", function() {
+  var other = Paths.resolve({
+    XDG_RUNTIME_DIR: "/run/elsewhere", XDG_STATE_HOME: "/data/state", XDG_DATA_HOME: null, HOME: "/srv/other"
+  })
+  assert.strictEqual(other.ok, true)
+  var a = everyArgv(TOOLS, paths)
+  var b = everyArgv(TOOLS, other)
+  var differing = function(name) {
+    assert.strictEqual(a[name].length, b[name].length, name)
+    var slots = []
+    for (var i = 0; i < a[name].length; i++) {
+      if (a[name][i] !== b[name][i]) slots.push(i)
+    }
+    return slots
+  }
+  assert.deepStrictEqual(differing("prepareArgv"), [4, 5, 7], "runtime dir, state dir, runtime base")
+  assert.deepStrictEqual(differing("writeArgv"), [4], "the target")
+  assert.deepStrictEqual(differing("readArgv"), [4], "the file")
+  assert.deepStrictEqual(differing("removeArgv"), [3, 4], "the files")
+  assert.deepStrictEqual(differing("purgeArgv"), [1], "the directory")
+  assert.deepStrictEqual(differing("cleanupArgv"), [7, 8, 9, 10, 11, 12, 13], "the seven paths")
+  assert.deepStrictEqual(
+    Sh.readArgv(TOOLS, paths.stateFile, 10).map(function(part, i) {
+      return part === Sh.readArgv(TOOLS, paths.stateFile, 99)[i] ? "" : part
+    }),
+    ["", "", "11", "", ""], "and the byte count")
+})
+
+test("every element is a constant, a tool, or a path from Paths", function() {
+  var all = everyArgv(TOOLS, paths)
+  var allowed = [
+    "-c", "--", "-f", "-rf", "-k", "-mindepth", "-maxdepth", "-type", "f", "-delete", "1", "2", "5",
+    "omajuke-prepare", "omajuke-write", Sh.PREPARE, Sh.PRIVATE_WRITE, Const.MPRIS_SO,
+    String(Const.LIMITS.stateBytes + 1)
+  ]
+  Object.keys(TOOLS).forEach(function(name) { allowed.push(TOOLS[name]) })
+  Object.keys(paths).forEach(function(name) { allowed.push(paths[name]) })
+  allowed.push(Paths.infoFile(paths, 1), Paths.thumbFile(paths, 2))
+  Object.keys(all).forEach(function(name) {
+    all[name].forEach(function(part) {
+      assert.ok(allowed.indexOf(part) !== -1, name + " holds something else: " + part.slice(0, 60))
+    })
+  })
+})
+
+test("no builder can be given a video id", function() {
+  // The builders take a tool table and paths (or a byte count), and the
+  // only variable part of a path is a counter.
+  assert.deepStrictEqual(
+    [Sh.prepareArgv.length, Sh.writeArgv.length, Sh.readArgv.length, Sh.removeArgv.length,
+      Sh.purgeArgv.length, Sh.cleanupArgv.length],
+    [2, 2, 3, 2, 2, 2])
+  var id = "Abc123Def4Q"
+  var hostile = [id, "../" + id, id + ".json", "x/" + id, -1, 0, 1.5, "1", null, undefined, NaN, Infinity]
+  hostile.forEach(function(n) {
+    assert.strictEqual(Paths.infoFile(paths, n), "", "infoFile(" + String(n) + ")")
+    assert.strictEqual(Paths.thumbFile(paths, n), "", "thumbFile(" + String(n) + ")")
+  })
+  var text = JSON.stringify(everyArgv(TOOLS, paths))
+  assert.ok(text.indexOf(id) === -1)
+  var names = [Paths.infoFile(paths, 1), Paths.infoFile(paths, 9999999999), Paths.thumbFile(paths, 77)]
+  names.forEach(function(name) {
+    assert.match(name.slice(name.lastIndexOf("/") + 1), /^[0-9]{1,10}\.(json|jpg)$/, name)
+    assert.strictEqual(Paths.owns(paths, name), true, name)
+  })
+})
+
+test("what the builders name is what Paths.owns guards", function() {
+  assert.strictEqual(Paths.owns(paths, Sh.writeArgv(TOOLS, paths.stateFile)[4]), true)
+  assert.strictEqual(Paths.owns(paths, Sh.readArgv(TOOLS, paths.stateFile, 5)[4]), true)
+  // The clean-up names directories and the socket, which no job of the
+  // running service may touch: none of them passes the gate.
+  Sh.cleanupArgv(TOOLS, paths).slice(7).forEach(function(target) {
+    assert.strictEqual(Paths.owns(paths, target), false, target)
+  })
+})
+
+test("the builders do not look at their paths: deciding is not their job", function() {
+  // PrivateFs asks Paths.owns() before it builds a command; a builder only
+  // places what it is given, as one element, whatever it contains.
+  var odd = "/tmp/a b; $(id) 'q' \"d\"\n-rf"
+  assert.strictEqual(Sh.writeArgv(TOOLS, odd)[4], odd)
+  assert.strictEqual(Sh.readArgv(TOOLS, odd, 5)[4], odd)
+  assert.deepStrictEqual(Sh.removeArgv(TOOLS, [odd, odd]).slice(3), [odd, odd])
+  assert.strictEqual(Sh.purgeArgv(TOOLS, odd)[1], odd)
+  assert.strictEqual(Sh.writeArgv(TOOLS, odd).length, 5)
+})

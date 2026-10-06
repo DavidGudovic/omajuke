@@ -1,0 +1,28 @@
+# Nothing generated belongs in the plugin directory: the shell hot-reloads
+# every plugin whenever a file under it changes.
+node_modules/
+__pycache__/
+*.pyc
+*.qmlc
+*.jsc
+.qmlls.ini
+
+# Personal data the plugin keeps outside the repository. Listed in case a
+# copy ever lands here: play history, the YouTube login, mpv's socket, and
+# real captures used as local test fixtures.
+state.json
+cookies.txt
+*.sock
+tests/fixtures/local/
+
+# Local editor and agent state
+.claude/
+CLAUDE.md
+AGENTS.md
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Working notes for the build; never published
+.dev/
