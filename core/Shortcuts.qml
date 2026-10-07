@@ -69,10 +69,10 @@ Item {
   readonly property string gate: _gate
   // A pass is running.
   readonly property bool busy: _running
-  // Nobody has answered the question whether to turn shortcuts on, and no
-  // action has one: the panel may ask, once.
+  // Nobody has answered the question whether to turn shortcuts on, no
+  // action has one, and a yes is not being carried out: the panel may ask.
   readonly property bool firstUse: root.store !== null && root.store.loaded === true && !root._keys().asked
-    && !root._anyCombo()
+    && !root._anyCombo() && !root._suggest
 
   // ---- Private ----
 
@@ -165,15 +165,19 @@ Item {
     return root._trigger()
   }
 
-  // The answer to the question whether to turn shortcuts on. Either way it
-  // is not asked again; yes assigns the proposals.
+  // The answer to the question whether to turn shortcuts on. No is final.
+  // Yes assigns the proposals, and is only final once a pass could make
+  // them: on a release the lines were not tried on, or while the
+  // configuration has errors, nothing is assigned and the question may come
+  // again.
   function answerPrompt(enable: bool): bool {
     if (!root._usable()) return false
+    if (enable === true) return root.assignSuggested()
     var keys = root._keys()
     keys.asked = true
     if (root.store.patch({ shortcuts: keys }) !== true) return false
     root._flush()
-    return enable === true ? root.assignSuggested() : true
+    return true
   }
 
   // The user gives a shortcut up. The pass removes the bind where the list
@@ -255,6 +259,8 @@ Item {
     var keys = root._keys()
     keys[action] = combo
     if (dirty) keys.dirty = true
+    // Whoever chose a shortcut has no need of the first-use question.
+    if (dirty && combo !== "") keys.asked = true
     return root.store !== null && root.store.patch({ shortcuts: keys }) === true
   }
 
@@ -645,11 +651,18 @@ Item {
 
   // Saves the proposals of the rows just made as wishes, and has one more
   // pass follow to bind them. A pass that could only look, or a list that
-  // could not be read, proposes nothing: the request is dropped and the
-  // rows say why.
+  // could not be read, proposes nothing: the request is dropped, the rows
+  // say why, and the first-use question stays unanswered.
   function _takeProposals(pass, listing, rows) {
+    if (pass.readOnly || !listing.ok) {
+      root._suggest = false
+      return
+    }
+    // Kept before the request ends, so the question does not show between.
+    var keys = root._keys()
+    keys.asked = true
+    root.store.patch({ shortcuts: keys })
     root._suggest = false
-    if (pass.readOnly || !listing.ok) return
     var taken = []
     for (var i = 0; i < rows.length; i++) {
       var row = rows[i]
@@ -657,9 +670,8 @@ Item {
       if (root._desired(row.action) !== "") continue
       if (root._save(row.action, row.proposal, true)) taken.push(row.proposal)
     }
-    if (taken.length === 0) return
     root._flush()
-    root._again = true
+    if (taken.length > 0) root._again = true
   }
 
   // ---- The end of the service ----

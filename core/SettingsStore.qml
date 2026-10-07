@@ -112,10 +112,9 @@ Item {
     root._rawText = text
     root._raw = found
     var left = Settings.unsettled(root._pending, found, before, root._sent)
-    if (Object.keys(left).length !== Object.keys(root._pending).length) {
-      root._sent = Settings.earlierSent(root._sent, left, "")
-      root._pending = left
-    }
+    // The changes the entry has now shown are behind the host.
+    root._sent = Settings.earlierSent(Settings.echoed(root._sent, found), left, "")
+    if (Object.keys(left).length !== Object.keys(root._pending).length) root._pending = left
     root._schedule()
   }
 

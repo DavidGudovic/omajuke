@@ -147,7 +147,8 @@ OmaJuke can give six actions a key that works anywhere on the desktop. Nothing i
 you ask. On first use the panel asks once: **Turn on** assigns to every action the first free key
 it proposes below and opens the shortcuts page, so you see what each got; **No thanks** leaves
 everything as it is. Either answer is final, and the question never comes back once any action
-has a key. The shortcuts page, opened from the settings page, does the same one action at a time:
+has a key. The one exception: where the page cannot bind yet (an untested Hyprland release, or
+errors in your configuration), **Turn on** assigns nothing and the question comes back. The shortcuts page, opened from the settings page, does the same one action at a time:
 **Assign** takes the proposed key, **Change…** records another combination (hold Super, Ctrl or
 Alt, with Shift if you like, and press a letter or one of F1 to F12; Esc cancels), and
 **Unassign** removes the bind.

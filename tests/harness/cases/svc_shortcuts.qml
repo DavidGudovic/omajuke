@@ -317,7 +317,7 @@ QtObject {
     var h = root.h
     var s = h.service
     h.check(s.answerShortcutsPrompt(true), "suggested: the answer is taken")
-    h.equal(h.parts.store.values.shortcuts.asked, true, "suggested: and kept")
+    h.equal(s.shortcutsPrompt, false, "suggested: not asked again while the yes is carried out")
     var all = function() {
       return s.shortcutsBusy === false && h.service.shortcuts.every(function(entry) {
         return entry.status === "assigned"
@@ -329,6 +329,7 @@ QtObject {
       h.equal(h.stubState("hyprctl").binds.length, combos.length,
         "suggested: one bind each, on the desktop that had none of its own")
       h.equal(s.shortcutsPrompt, false, "suggested: nothing left to ask")
+      h.equal(h.parts.store.values.shortcuts.asked, true, "suggested: and the answer is kept")
       root.next()
     })
   }

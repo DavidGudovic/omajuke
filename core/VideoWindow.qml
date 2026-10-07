@@ -156,7 +156,7 @@ Item {
   // waits for the last press of a burst.
   function placementChosen() {
     root.resetPlacement()
-    if (root._wanted && root._window) moveTimer.restart()
+    if (root._wanted && (root._window || root._opening)) moveTimer.restart()
   }
 
   // ---- The rule ----
@@ -338,7 +338,13 @@ Item {
   // the same steps as hiding it and showing it, without giving up the wish
   // and without remembering the old place. The sound plays on throughout.
   function _move() {
-    if (!root._wanted || !root._window || root._opening || root._closing || !root._usable()) return
+    if (!root._wanted || !root._usable()) return
+    // A window that is still opening or closing is moved once it has.
+    if (root._opening || root._closing) {
+      moveTimer.restart()
+      return
+    }
+    if (!root._window) return
     root._pass += 1
     root._selected = false
     loadingTimer.stop()

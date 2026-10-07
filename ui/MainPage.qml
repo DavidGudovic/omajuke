@@ -290,9 +290,9 @@ Item {
     } else if (name === "sponsorOn" || name === "sponsorOff") {
       if (root.service) root.service.answerSponsorPrompt(name === "sponsorOn")
     } else if (name === "shortcutsOn" || name === "shortcutsOff") {
-      if (root.service) root.service.answerShortcutsPrompt(name === "shortcutsOn")
+      var taken = root.service ? root.service.answerShortcutsPrompt(name === "shortcutsOn") : false
       // The page shows what came of it, key by key.
-      if (name === "shortcutsOn") root.navigate("shortcuts")
+      if (taken && name === "shortcutsOn") root.navigate("shortcuts")
     } else if (name === "feeds") {
       root.pickFeed(Ui.FEEDS[Ui.clampIndex(root.chipIndex, Ui.FEEDS.length)].value)
     }

@@ -11,8 +11,9 @@ Added:
 - Three more shortcuts: **Play or pause**, **Next track** and **Previous track**. Like the others
   they are assigned only when you ask, and they propose Super+Ctrl+Alt with K, N and B.
 - On first use the panel asks once whether to turn shortcuts on. **Turn on** assigns a free key
-  to every action and opens the shortcuts page; **No thanks** is final. Either way it is not
-  asked again.
+  to every action and opens the shortcuts page; **No thanks** is final. On a Hyprland release the
+  shortcuts were not tried on, or while your configuration has errors, **Turn on** assigns
+  nothing, the page says why, and the question comes back later.
 
 Changed:
 

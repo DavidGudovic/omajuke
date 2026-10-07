@@ -524,6 +524,38 @@ var CASES = [
   { fn: "unsettled",
     args: [{ videoCorner: "bottom-left" }, { videoCorner: "top-right" }, {}, null], expect: {} },
 
+  // Stepping A, B and back to A: the first A the host shows is the earlier
+  // one, and the newest A still waits behind B.
+  { fn: "unsettled",
+    args: [{ videoCorner: "top-left" }, { videoCorner: "top-left" }, { videoCorner: "bottom-right" },
+      { videoCorner: ["top-left", "bottom-left"] }],
+    expect: { videoCorner: "top-left" } },
+  { fn: "unsettled",
+    args: [{ videoCorner: "top-left" }, { videoCorner: "bottom-left" }, { videoCorner: "top-left" },
+      { videoCorner: ["bottom-left"] }],
+    expect: { videoCorner: "top-left" } },
+  { fn: "unsettled",
+    args: [{ videoCorner: "top-left" }, { videoCorner: "top-left" }, { videoCorner: "bottom-left" }, {}],
+    expect: {} },
+
+  // ---- echoed: the earlier changes the host has not shown yet ----
+  { fn: "echoed", args: [{}, {}], expect: {} },
+  { fn: "echoed", args: [null, null], expect: {} },
+  { fn: "echoed", args: [{ videoCorner: ["top-left", "bottom-left"] }, { videoCorner: "top-left" }],
+    expect: { videoCorner: ["bottom-left"] } },
+  { fn: "echoed", args: [{ videoCorner: ["bottom-left"] }, { videoCorner: "bottom-left" }], expect: {} },
+  // Shown out of order: everything before the one shown is behind the host too.
+  { fn: "echoed", args: [{ videoCorner: ["top-left", "bottom-left", "top-right"] },
+    { videoCorner: "bottom-left" }], expect: { videoCorner: ["top-right"] } },
+  // Spelled differently by the host, it is still the same change.
+  { fn: "echoed", args: [{ maxHeight: [720, 480] }, { maxHeight: "720" }], expect: { maxHeight: [480] } },
+  // A value that is none of ours leaves the list as it is.
+  { fn: "echoed", args: [{ videoCorner: ["top-left"] }, { videoCorner: "top-right" }],
+    expect: { videoCorner: ["top-left"] } },
+  { fn: "echoed", args: [{ videoCorner: ["top-left"] }, {}], expect: { videoCorner: ["top-left"] } },
+  // What is not a setting, or a list that is no list, is dropped.
+  { fn: "echoed", args: [{ volume: [5], videoCorner: "top-left" }, {}], expect: {} },
+
   // ---- earlierSent: what is remembered of earlier changes ----
   { fn: "earlierSent", args: [{}, {}, "videoCorner"], expect: {} },
   { fn: "earlierSent", args: [null, null, ""], expect: {} },
