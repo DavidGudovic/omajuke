@@ -1152,6 +1152,12 @@ var CASES = [
   { fn: "topNotice", args: [false, false, true, false], expect: "output" },
   { fn: "topNotice", args: [1, "yes", {}, "true"], expect: "" },
   { fn: "topNotice", args: [null, null, null, null], expect: "" },
+  // The question about shortcuts comes last of all.
+  { fn: "topNotice", args: [false, false, false, false, true], expect: "shortcuts" },
+  { fn: "topNotice", args: [false, false, false, true, true], expect: "sponsor" },
+  { fn: "topNotice", args: [false, false, true, false, true], expect: "output" },
+  { fn: "topNotice", args: [true, false, false, false, true], expect: "account" },
+  { fn: "topNotice", args: [false, false, false, false, "true"], expect: "" },
 
   // ---- listHeight ----
   // Seven rows and room for them.

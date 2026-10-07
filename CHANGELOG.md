@@ -2,6 +2,30 @@
 
 Every released version of OmaJuke, newest first. Only changes a user can see are listed.
 
+## 0.3.0 - 2026-10-07
+
+More shortcuts, an offer to turn them on, and a video window that moves when you pick a new place.
+
+Added:
+
+- Three more shortcuts: **Play or pause**, **Next track** and **Previous track**. Like the others
+  they are assigned only when you ask, and they propose Super+Ctrl+Alt with K, N and B.
+- On first use the panel asks once whether to turn shortcuts on. **Turn on** assigns a free key
+  to every action and opens the shortcuts page; **No thanks** is final. Either way it is not
+  asked again.
+
+Changed:
+
+- Picking a new video corner or size in the settings moves a video window that is open, and
+  forgets the places the window was left in, so the new choice counts on every monitor.
+- While signed in, the list chips stay on one line and scroll sideways where the panel is too
+  narrow. The History chip is gone: the home list already shows what you played.
+
+Fixed:
+
+- Stepping through the video corner, size or quality with the arrow keys could lag and land on
+  the wrong choice, because each step briefly showed the one before it.
+
 ## 0.2.2 - 2026-10-07
 
 One fix, for videos that would not play.

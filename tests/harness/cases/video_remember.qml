@@ -38,7 +38,8 @@ QtObject {
     root.parts.start(1, "Abc123Def4Q", root.parts.url("one"))
     root.steps = [
       root.untouched, root.moved, root.usedNextTime, root.leftThere, root.otherMonitor, root.notOurs,
-      root.notFloating, root.unusableName, root.settingsWithoutMemory, root.manyMonitors, root.reset
+      root.notFloating, root.unusableName, root.settingsWithoutMemory, root.manyMonitors, root.reset,
+      root.movedByChoice
     ]
     root.next()
   }
@@ -238,6 +239,45 @@ QtObject {
         "many monitors: eight are kept, the oldest made room")
       h.equal(kept["DP-1"], { corner: "bottom-right", widthPct: 42 }, "many monitors: the new place is there")
       root.next()
+    })
+  }
+
+  // Picking a place in the settings while the window is open: what was
+  // remembered is forgotten, and the window is closed and opened again
+  // under a rule for the new place, once, after the last of a burst of
+  // picks. The wish stands throughout and the old place is not stored.
+  function movedByChoice() {
+    var h = root.h
+    root.parts.store.patch({ video: { "DP-1": { corner: "top-left", widthPct: 40 } } })
+    h.equal(root.video.showVideo(), true, "chosen: show")
+    root.until("chosen: shown", function() { return root.video.videoState === "shown" }, function() {
+      var sent = root.parts.lines().length
+      root.parts.placeWindow([5, 35], [768, 432], {})
+      root.player.clearCalls()
+      root.parts.set({ videoCorner: "top-right" })
+      root.video.placementChosen()
+      root.parts.set({ videoCorner: "top-left" })
+      root.video.placementChosen()
+      h.equal(root.parts.store.video(), {}, "chosen: every remembered place is forgotten at once")
+      root.until("chosen: moved", function() {
+        return root.parts.lines().length > sent && root.video.videoState === "shown"
+      }, function() {
+        h.equal(root.parts.lines().slice(sent), [root.rule(17, "top-left", 5, 35)],
+          "chosen: one rule, for the place picked last")
+        var names = root.player.names()
+        h.check(names.indexOf("selectVideo:0") !== -1 && names.indexOf("setForceWindow:false") !== -1,
+          "chosen: the window was closed")
+        h.equal(names.slice(-1)[0], "setKeepAwake:true", "chosen: and opened again with the picture")
+        h.check(names.indexOf("setVideoWatch:false") === -1, "chosen: the wish stood throughout")
+        h.equal(root.video.wanted, true, "chosen: and stands")
+        h.equal(root.parts.store.video(), {}, "chosen: the old place was not remembered")
+        root.video.hideVideo()
+        root.until("chosen: hidden", function() { return root.video.videoState === "hidden" }, function() {
+          root.video.placementChosen()
+          h.equal(root.parts.lines().length, sent + 1, "chosen: with no window nothing is sent")
+          root.next()
+        })
+      })
     })
   }
 

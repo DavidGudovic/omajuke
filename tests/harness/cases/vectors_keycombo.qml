@@ -92,7 +92,7 @@ QtObject {
     var text = h.readFile(h.repo + "/tests/fixtures/binds.txt")
     var list = KeyCombo.parseBinds(text)
     h.check(list.ok, "the list of a whole desktop is readable")
-    h.equal(list.records.length, 231, "with all of its binds")
+    h.equal(list.records.length, 237, "with all of its binds")
     h.equal(KeyCombo.parseBinds(text.slice(0, text.length - 2)), { ok: false, records: null },
       "and is not, once its end is cut off")
     var video = KeyCombo.parse("SUPER + CTRL + ALT + V")

@@ -27,7 +27,10 @@ var KEYS = LETTERS.concat(["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9",
 var ACTIONS = [
   { name: "panel", words: "toggle", description: "OmaJuke: open panel" },
   { name: "video", words: "video toggle", description: "OmaJuke: show or hide video" },
-  { name: "output", words: "output next", description: "OmaJuke: next audio output" }
+  { name: "output", words: "output next", description: "OmaJuke: next audio output" },
+  { name: "playPause", words: "playPause", description: "OmaJuke: play or pause" },
+  { name: "next", words: "next", description: "OmaJuke: next track" },
+  { name: "previous", words: "previous", description: "OmaJuke: previous track" }
 ]
 
 var CORNERS = [
@@ -303,7 +306,7 @@ test("the lines have their known sizes: 438 and at most 456 bytes, 156 and 38", 
 test("there are 532 combinations, and bind and unbind return the exact line for each", function() {
   assert.strictEqual(ALIASES.length, 532)
   assert.strictEqual(new Set(ALIASES).size, 532)
-  assert.strictEqual(SHORT_LINES.size, 532 * 4)
+  assert.strictEqual(SHORT_LINES.size, 532 * (ACTIONS.length + 1))
   ALIASES.forEach(function(alias) {
     var removed = Lua.unbind(alias)
     assert.strictEqual(removed, expectedUnbind(alias))
@@ -400,7 +403,7 @@ test("a bind's description has no comma, and its command names this plugin and n
       .exec(line)
     assert.ok(found, line)
     assert.strictEqual(found[1], "omarchy-shell -q " + Const.PLUGIN_ID + " " + action.words)
-    assert.match(found[1], /^[a-z0-9 .-]+$/)
+    assert.match(found[1], /^[A-Za-z0-9 .-]+$/)
     assert.strictEqual(found[2], action.description)
     assert.strictEqual(found[2].indexOf(","), -1)
     assert.strictEqual(found[2].indexOf(Const.APP_NAME + ": "), 0)
@@ -566,7 +569,7 @@ test("a combination with the separator, case or spacing changed is not a combina
   })
 })
 
-test("bind takes only the three action names, and only as plain strings", function() {
+test("bind takes only the six action names, and only as plain strings", function() {
   var bad = ["", "Panel", "PANEL", "panel ", " panel", "panels", "toggle", "video toggle", "output next",
     "constructor", "__proto__", "prototype", "toString", "hasOwnProperty", "name", "description", "command",
     "length", "0", "1", 0, 1, null, undefined, true, ["panel"], { name: "panel" }, new String("panel")]
@@ -737,7 +740,7 @@ test("a bind passes only when command and description belong to the same action"
       })
     })
   })
-  assert.strictEqual(passed, 532 * 3)
+  assert.strictEqual(passed, 532 * ACTIONS.length)
 })
 
 test("several edits at once pass only when the result is a line of ours", function() {

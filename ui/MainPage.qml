@@ -96,10 +96,12 @@ Item {
     ? String(service.errorText("E_NEEDS_ACCOUNT") || "") + ". " + Ui.TEXT.ACCOUNT_ASK : ""
   // The question whether to skip sponsor segments waits for an answer.
   readonly property bool sponsorPrompt: service ? service.sponsorPrompt === true : false
+  // So does the question, on first use, whether to turn shortcuts on.
+  readonly property bool shortcutsPrompt: service ? service.shortcutsPrompt === true : false
   // The one notice that shows. The others wait their turn behind it, so
   // that the list and the strip keep their room.
   readonly property string notice: Ui.topNotice(accountOffer, noticeCode !== "", outputNote !== "",
-    sponsorPrompt)
+    sponsorPrompt, shortcutsPrompt)
   // The now-playing strip is on screen.
   readonly property bool stripShown: service ? service.hasTrack === true : false
   // What everything on the page but the list takes of its height, with the
@@ -130,6 +132,7 @@ Item {
     else if (root.notice === "service") names.push("dismiss")
     else if (root.notice === "output") names.push("outputs")
     else if (root.notice === "sponsor") names.push("sponsorOn", "sponsorOff")
+    else if (root.notice === "shortcuts") names.push("shortcutsOn", "shortcutsOff")
     if (root.chipsShown) names.push("feeds")
     return names
   }
@@ -286,6 +289,10 @@ Item {
       root.navigate("outputs")
     } else if (name === "sponsorOn" || name === "sponsorOff") {
       if (root.service) root.service.answerSponsorPrompt(name === "sponsorOn")
+    } else if (name === "shortcutsOn" || name === "shortcutsOff") {
+      if (root.service) root.service.answerShortcutsPrompt(name === "shortcutsOn")
+      // The page shows what came of it, key by key.
+      if (name === "shortcutsOn") root.navigate("shortcuts")
     } else if (name === "feeds") {
       root.pickFeed(Ui.FEEDS[Ui.clampIndex(root.chipIndex, Ui.FEEDS.length)].value)
     }
@@ -413,6 +420,8 @@ Item {
       root.body.ensureVisible(outputNotice)
     } else if (root.noticeCursor === "sponsorOn" || root.noticeCursor === "sponsorOff") {
       root.body.ensureVisible(sponsorNotice)
+    } else if (root.noticeCursor === "shortcutsOn" || root.noticeCursor === "shortcutsOff") {
+      root.body.ensureVisible(shortcutsNotice)
     } else if (root.noticeCursor === "feeds") {
       root.chipIndex = root.currentChip()
       root.body.ensureVisible(chips)
@@ -559,6 +568,24 @@ Item {
       fontFamily: root.fontFamily
       onPrimary: root.answerNotice("sponsorOn")
       onSecondary: root.answerNotice("sponsorOff")
+    }
+
+    // Asked once, on first use, while no action has a shortcut. Yes assigns
+    // the free keys the shortcuts page would suggest and opens that page;
+    // either answer is final.
+    Notice {
+      id: shortcutsNotice
+      width: parent.width
+      visible: root.notice === "shortcuts"
+      text: Ui.TEXT.SHORTCUTS_ASK
+      primaryLabel: Ui.TEXT.SHORTCUTS_ENABLE
+      secondaryLabel: Ui.TEXT.SHORTCUTS_DECLINE
+      cursor: root.noticeCursor === "shortcutsOn" ? "primary"
+        : (root.noticeCursor === "shortcutsOff" ? "secondary" : "")
+      fg: root.fg
+      fontFamily: root.fontFamily
+      onPrimary: root.answerNotice("shortcutsOn")
+      onSecondary: root.answerNotice("shortcutsOff")
     }
 
     // ---- The account's lists ----

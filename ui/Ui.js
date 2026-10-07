@@ -16,7 +16,7 @@
 // running service: a difference means the plugin was updated and the shell
 // not yet restarted, and the view then shows the restart notice and nothing
 // else.
-var VERSION = "0.2.2"
+var VERSION = "0.3.0"
 
 // ---- Glyphs ----
 
@@ -175,6 +175,10 @@ var TEXT = {
   SPONSOR_ASK: "Skip sponsor segments? Looks up a hash prefix of the video id at sponsor.ajay.app.",
   SPONSOR_ENABLE: "Enable",
   SPONSOR_DECLINE: "No thanks",
+  SHORTCUTS_ASK: "Turn on keyboard shortcuts? OmaJuke assigns free keys, like Super+Ctrl+Alt+K to play"
+    + " or pause. Change them under Settings, Shortcuts.",
+  SHORTCUTS_ENABLE: "Turn on",
+  SHORTCUTS_DECLINE: "No thanks",
   SPONSOR_SKIP: "Skip sponsor segments",
   SPONSOR_SKIP_HINT: "Looks up a hash prefix of the video id at sponsor.ajay.app.",
   SKIPPED: "Skipped sponsor segment",
@@ -247,7 +251,6 @@ var TEXT = {
   FEED_SUBS: "Subscriptions",
   FEED_LATER: "Watch later",
   FEED_PLAYLISTS: "Playlists",
-  FEED_HISTORY: "History",
   FEED_EMPTY: "Nothing here yet",
   PLAYLIST: "Playlist",
   ONE_VIDEO: "1 video",
@@ -303,11 +306,13 @@ var CHOICES = {
 
 // The lists a signed-in main page can show in place of the home list, as
 // the chips that select them: value is the kind the service knows, "" for
-// the home list itself.
+// the home list itself. The account's watch history has no chip: the home
+// list already shows what was played here, and six chips did not fit on
+// one line.
 var FEEDS = [
   { value: "", label: TEXT.FEED_HOME }, { value: "foryou", label: TEXT.FEED_FORYOU },
   { value: "subs", label: TEXT.FEED_SUBS }, { value: "later", label: TEXT.FEED_LATER },
-  { value: "playlists", label: TEXT.FEED_PLAYLISTS }, { value: "history", label: TEXT.FEED_HISTORY }
+  { value: "playlists", label: TEXT.FEED_PLAYLISTS }
 ]
 
 // The value delta chips away from value in options. At either end it stays
@@ -693,12 +698,14 @@ function rowTitle(track) {
 // appears when this one is answered or its reason is gone. First comes what
 // waits for a decision about the track that just failed ("account"), then
 // what the service has to tell ("service"), then that the chosen output is
-// gone ("output"), and last the question that can wait ("sponsor").
-function topNotice(account, service, output, sponsor) {
+// gone ("output"), and last the questions that can wait ("sponsor", then
+// "shortcuts").
+function topNotice(account, service, output, sponsor, shortcuts) {
   if (account === true) return "account"
   if (service === true) return "service"
   if (output === true) return "output"
-  return sponsor === true ? "sponsor" : ""
+  if (sponsor === true) return "sponsor"
+  return shortcuts === true ? "shortcuts" : ""
 }
 
 // How tall the main page's list is: as tall as its rows (content), at

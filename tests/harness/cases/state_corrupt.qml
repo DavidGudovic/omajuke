@@ -23,7 +23,11 @@ QtObject {
 
   readonly property var defaults: ({
     volume: 70, muted: false, proxyAck: false, prefs: {}, recents: [], queue: { items: [], index: -1 },
-    video: {}, shortcuts: { panel: "", video: "", output: "", dirty: false }, outputDevice: ""
+    video: {},
+    shortcuts: {
+      panel: "", video: "", output: "", playPause: "", next: "", previous: "", dirty: false, asked: false
+    },
+    outputDevice: ""
   })
 
   // mpv and yt-dlp only have to be executable files for prepare to succeed.

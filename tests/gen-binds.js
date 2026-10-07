@@ -26,11 +26,12 @@
 //   65  the digit row by number, and a key text written without spaces
 //   68  named keys only
 //   69  a catch-all, so no key here that nobody names can be confirmed
-//   72  the digit row and the V key by number, a combination OmaJuke shares
+//   72  the digit row and the V key by number, a combination OmaJuke shares,
+//       and one bind of each of the three actions added later
 //   73  the digit row by number
 //   76  one bind of OmaJuke's, one doubled bind of OmaJuke's, a bind inside
 //       a submap, and (as 78 and 92) the same modifiers plus Caps Lock, MOD2
-//   77  the three binds a user pasted from "Copy line", and one of OmaJuke's
+//   77  the six binds a user pasted from "Copy line", and one of OmaJuke's
 //   12  a function key by number, one in lower case
 //    8  two different binds on one key
 //    9  a key given as a numbered symbol
@@ -182,7 +183,7 @@ function rows() {
   // What "Copy line" leaves in a user's own configuration.
   KeyCombo.ACTIONS.forEach(function(name, i) {
     var pasted = KeyCombo.action(name).configDescription
-    add(SUPER + CTRL + ALT + SHIFT, ["J", "V", "O"][i], { description: pasted })
+    add(SUPER + CTRL + ALT + SHIFT, ["J", "V", "O", "K", "N", "B"][i], { description: pasted })
   })
 
   // ---- The smaller groups ----
@@ -234,6 +235,10 @@ function rows() {
   add(SUPER + CTRL + ALT, "O", { description: output })
   // On a combination that somebody else has as well.
   add(SUPER + ALT, "O", { description: output })
+  // The actions added later, each once.
+  add(SUPER + ALT, "K", { description: KeyCombo.action("playPause").description })
+  add(SUPER + ALT, "N", { description: KeyCombo.action("next").description })
+  add(SUPER + ALT, "B", { description: KeyCombo.action("previous").description })
 
   return list
 }

@@ -35,7 +35,7 @@ QtObject {
     root.setBinds([])
     root.steps = [
       root.becomesReady, root.pageOpens, root.refusals, root.assigns, root.reloadKept, root.reloadWiped,
-      root.reloadTaken, root.outputShortcut, root.serviceEnds, root.bareDesktop, root.quiet
+      root.reloadTaken, root.outputShortcut, root.serviceEnds, root.bareDesktop, root.suggested, root.quiet
     ]
     root.next()
   }
@@ -128,9 +128,11 @@ QtObject {
         h.equal(h.log("hyprctl").length, 0,
           "start: nobody asked for a shortcut, so the compositor is not asked")
         h.equal(root.shown(), [["panel", "unassigned", ""], ["video", "unassigned", ""],
-          ["output", "unassigned", ""]], "start: three actions, none with a shortcut")
+          ["output", "unassigned", ""], ["playPause", "unassigned", ""], ["next", "unassigned", ""],
+          ["previous", "unassigned", ""]], "start: six actions, none with a shortcut")
         h.equal([s.shortcutsGate, s.shortcutsBusy], ["ok", false],
           "start: nothing in the way, nothing running")
+        h.equal(s.shortcutsPrompt, true, "start: the panel may ask once whether to turn them on")
         h.hyprEvent("configreloaded")
         h.after(600, function() {
           h.equal(h.log("hyprctl").length, 0, "start: nor after a reload")
@@ -175,8 +177,9 @@ QtObject {
     h.equal(s.unassignShortcut("constructor"), false, "refused: no such action to take a shortcut from")
     h.after(400, function() {
       h.equal([h.log("hyprctl").length, root.lines()], [asked, []], "refused: the compositor heard nothing")
-      h.equal(h.parts.store.values.shortcuts, { panel: "", video: "", output: "", dirty: false },
-        "refused: and nothing was saved")
+      h.equal(h.parts.store.values.shortcuts, {
+        panel: "", video: "", output: "", playPause: "", next: "", previous: "", dirty: false, asked: false
+      }, "refused: and nothing was saved")
       h.check(s.copyShortcutLine("video", root.videoCombo),
         "a line for the user's own configuration is copied")
       root.next()
@@ -192,6 +195,7 @@ QtObject {
       h.equal(root.lines(), [root.bindLine("video", root.videoCombo)], "assign: one line, the bind")
       h.equal(root.table(), [root.ours("video", root.videoCombo)], "assign: the compositor holds it")
       h.equal(root.row("video").combo, root.videoCombo, "assign: the row shows the combination")
+      h.equal(s.shortcutsPrompt, false, "assign: with a shortcut there is nothing to ask")
       root.until("assign: saved and confirmed", function() {
         var saved = h.parts.store.values.shortcuts
         return saved.video === root.videoCombo && saved.dirty === false
@@ -302,6 +306,29 @@ QtObject {
         "bare: the saved shortcut is bound on a desktop without any other bind")
       h.equal(root.lines().slice(sent), [root.bindLine("output", root.outputCombo)], "bare: with one line")
       h.equal(root.row("output").status, "assigned", "bare: and the row says so")
+      root.next()
+    })
+  }
+
+  // The answer yes to the first-use question: every action without a
+  // shortcut gets the free combination its row proposes, each its own, and
+  // the question is not asked again.
+  function suggested() {
+    var h = root.h
+    var s = h.service
+    h.check(s.answerShortcutsPrompt(true), "suggested: the answer is taken")
+    h.equal(h.parts.store.values.shortcuts.asked, true, "suggested: and kept")
+    var all = function() {
+      return s.shortcutsBusy === false && h.service.shortcuts.every(function(entry) {
+        return entry.status === "assigned"
+      })
+    }
+    root.until("suggested: every action has a shortcut", all, 15000, function() {
+      var combos = h.service.shortcuts.map(function(entry) { return entry.combo })
+      h.equal(new Set(combos).size, combos.length, "suggested: no two on the same combination")
+      h.equal(h.stubState("hyprctl").binds.length, combos.length,
+        "suggested: one bind each, on the desktop that had none of its own")
+      h.equal(s.shortcutsPrompt, false, "suggested: nothing left to ask")
       root.next()
     })
   }

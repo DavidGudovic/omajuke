@@ -16,7 +16,7 @@ QtObject {
   property string kind: "component"
 
   readonly property var modifiers: ["MOD4", "CONTROL", "MOD1", "SHIFT"]
-  readonly property var actions: ["panel", "video", "output"]
+  readonly property var actions: ["panel", "video", "output", "playPause", "next", "previous"]
   readonly property var corners: ["top-left", "top-right", "bottom-left", "bottom-right"]
   readonly property var margins: [0, 1, 5, 9, 10, 30, 99, 100, 999, 1000, 1999, 2000]
 

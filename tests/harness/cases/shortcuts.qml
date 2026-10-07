@@ -61,7 +61,10 @@ QtObject {
   }
 
   function wishes(panel, video, output, dirty) {
-    return { panel: panel, video: video, output: output, dirty: dirty }
+    return {
+      panel: panel, video: video, output: output, playPause: "", next: "", previous: "", dirty: dirty,
+      asked: false
+    }
   }
 
   // Somebody who never asked for a shortcut costs the compositor nothing.
@@ -78,8 +81,11 @@ QtObject {
       }), [
         ["panel", "Open panel", "", "unassigned", "", ""],
         ["video", "Show or hide video", "", "unassigned", "", ""],
-        ["output", "Next audio output", "", "unassigned", "", ""]
-      ], "quiet: three rows without a shortcut")
+        ["output", "Next audio output", "", "unassigned", "", ""],
+        ["playPause", "Play or pause", "", "unassigned", "", ""],
+        ["next", "Next track", "", "unassigned", "", ""],
+        ["previous", "Previous track", "", "unassigned", "", ""]
+      ], "quiet: six rows without a shortcut")
       h.equal([parts.keys.gate, parts.keys.busy], ["ok", false],
         "quiet: nothing stands in the way, nothing runs")
       root.next()

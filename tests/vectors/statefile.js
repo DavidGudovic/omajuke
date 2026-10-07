@@ -12,10 +12,24 @@ var MODULE = "StateFile"
 
 var _NO = { ok: false }
 
+// A shortcuts entry: no combination for any action and nothing unconfirmed,
+// except what is given.
+function _keys(given) {
+  var keys = {
+    panel: "", video: "", output: "", playPause: "", next: "", previous: "", dirty: false, asked: false
+  }
+  var names = Object.keys(given)
+  for (var i = 0; i < names.length; i++) keys[names[i]] = given[names[i]]
+  return keys
+}
+
 // The state of a first start.
+// The members a file written before the last three actions existed lacks.
+var _LATER = "\"playPause\":\"\",\"next\":\"\",\"previous\":\"\","
+
 var _DEFAULTS = {
   volume: 70, muted: false, proxyAck: false, prefs: {}, recents: [], queue: { items: [], index: -1 },
-  video: {}, shortcuts: { panel: "", video: "", output: "", dirty: false }, outputDevice: ""
+  video: {}, shortcuts: _keys({}), outputDevice: ""
 }
 
 // What is written for it, with and without history.
@@ -157,8 +171,10 @@ function _bigState() {
     volume: 100, muted: false, proxyAck: false,
     prefs: { rememberHistory: false, preload: false, autoplay: false },
     recents: recents, queue: { items: items, index: 199 }, video: video,
-    shortcuts: { panel: _repeat(_WIDE, 64), video: _repeat(_WIDE, 64), output: _repeat(_WIDE, 64),
-      dirty: false },
+    shortcuts: _keys({
+      panel: _repeat(_WIDE, 64), video: _repeat(_WIDE, 64), output: _repeat(_WIDE, 64),
+      playPause: _repeat(_WIDE, 64), next: _repeat(_WIDE, 64), previous: _repeat(_WIDE, 64)
+    }),
     outputDevice: _repeat(_WIDE, 256)
   }
 }
@@ -179,8 +195,8 @@ function _bigText() {
     + "\"queue\":{\"items\":[" + items.join(",") + "],\"index\":199},"
     + "\"video\":{" + video.join(",") + "},"
     + "\"shortcuts\":{\"panel\":" + combo + ",\"video\":" + combo + ",\"output\":" + combo
-    + ",\"dirty\":false},"
-    + "\"outputDevice\":\"" + _repeat(_WIDE_ESCAPED, 256) + "\"}"
+    + ",\"playPause\":" + combo + ",\"next\":" + combo + ",\"previous\":" + combo + ",\"dirty\":false,"
+    + "\"asked\":false},\"outputDevice\":\"" + _repeat(_WIDE_ESCAPED, 256) + "\"}"
 }
 
 var _BIG = _bigState()
@@ -414,22 +430,27 @@ var CASES = [
   // ---- parse: shortcuts, kept as inert text ----
   { fn: "parse",
     args: [_file({ shortcuts: { panel: "", video: "SUPER + CTRL + ALT + V", output: "", dirty: false } })],
-    expect: _ok({ shortcuts: { panel: "", video: "SUPER + CTRL + ALT + V", output: "", dirty: false } }) },
+    expect: _ok({ shortcuts: _keys({ video: "SUPER + CTRL + ALT + V" }) }) },
   { fn: "parse", args: [_file({ shortcuts: { panel: "SUPER + Y", dirty: true, extra: "x" } })],
-    expect: _ok({ shortcuts: { panel: "SUPER + Y", video: "", output: "", dirty: true } }) },
+    expect: _ok({ shortcuts: _keys({ panel: "SUPER + Y", dirty: true }) }) },
   // Whatever the text says, it is only text here.
   { fn: "parse", args: [_file({ shortcuts: { panel: _LUA, video: "]] os.exit() --[[", output: "a\nb" } })],
-    expect: _ok({ shortcuts: { panel: _LUA, video: "]] os.exit() --[[", output: "a\nb", dirty: false } }) },
+    expect: _ok({ shortcuts: _keys({ panel: _LUA, video: "]] os.exit() --[[", output: "a\nb" }) }) },
   { fn: "parse", args: [_file({ shortcuts: { panel: "constructor", video: "__proto__", output: "all" } })],
-    expect: _ok({ shortcuts: { panel: "constructor", video: "__proto__", output: "all", dirty: false } }) },
+    expect: _ok({ shortcuts: _keys({ panel: "constructor", video: "__proto__", output: "all" }) }) },
   { fn: "parse", args: [_file({ shortcuts: { panel: _repeat("K", 64), video: _repeat("K", 65) } })],
-    expect: _ok({ shortcuts: { panel: _repeat("K", 64), video: "", output: "", dirty: false } }) },
+    expect: _ok({ shortcuts: _keys({ panel: _repeat("K", 64) }) }) },
   { fn: "parse",
     args: [_file({ shortcuts: { panel: 5, video: ["SUPER + V"], output: null, dirty: "true" } })],
     expect: _ok({}) },
   // Half of a surrogate pair is kept like any other unit.
   { fn: "parse", args: ["{\"version\":1,\"shortcuts\":{\"panel\":\"a\\ud83db\"}}"],
-    expect: _ok({ shortcuts: { panel: "a\ud83db", video: "", output: "", dirty: false } }) },
+    expect: _ok({ shortcuts: _keys({ panel: "a\ud83db" }) }) },
+  // The question was answered: kept, and only a real true counts.
+  { fn: "parse", args: [_file({ shortcuts: { asked: true } })],
+    expect: _ok({ shortcuts: _keys({ asked: true }) }) },
+  { fn: "parse", args: [_file({ shortcuts: { asked: "true", panel: "SUPER + Y" } })],
+    expect: _ok({ shortcuts: _keys({ panel: "SUPER + Y" }) }) },
   { fn: "parse", args: [_file({ shortcuts: ["SUPER + Y"] })], expect: _ok({}) },
   { fn: "parse", args: [_file({ shortcuts: "SUPER + Y" })], expect: _ok({}) },
   { fn: "parse",
@@ -471,12 +492,12 @@ var CASES = [
     args: [_file({ volume: 55, muted: true, proxyAck: true, prefs: { rememberHistory: false },
       recents: [_A], queue: { items: [_item(_B, true)], index: 0 },
       video: { "DP-1": { corner: "bottom-right", widthPct: 25 } },
-      shortcuts: { panel: "", video: "SUPER + CTRL + ALT + V", output: "", dirty: false },
+      shortcuts: _keys({ video: "SUPER + CTRL + ALT + V" }),
       outputDevice: "alsa/default" })],
     expect: { ok: true, state: { volume: 55, muted: true, proxyAck: true, prefs: { rememberHistory: false },
       recents: [_A], queue: { items: [_item(_B, true)], index: 0 },
       video: { "DP-1": { corner: "bottom-right", widthPct: 25 } },
-      shortcuts: { panel: "", video: "SUPER + CTRL + ALT + V", output: "", dirty: false },
+      shortcuts: _keys({ video: "SUPER + CTRL + ALT + V" }),
       outputDevice: "alsa/default" } } },
 
   // ---- serialize: with and without history ----
@@ -505,11 +526,16 @@ var CASES = [
   { fn: "serialize", args: [_state({ video: { "DP-1": { corner: "top-left", widthPct: 33 } } }), false],
     expect: _HEAD + ",\"video\":{\"DP-1\":{\"corner\":\"top-left\",\"widthPct\":33}}}" },
   { fn: "serialize",
-    args: [_state({ shortcuts: { panel: "SUPER + Y", video: "", output: "", dirty: false } }), false],
+    args: [_state({ shortcuts: _keys({ panel: "SUPER + Y" }) }), false],
     expect: _HEAD
-      + ",\"shortcuts\":{\"panel\":\"SUPER + Y\",\"video\":\"\",\"output\":\"\",\"dirty\":false}}" },
-  { fn: "serialize", args: [_state({ shortcuts: { panel: "", video: "", output: "", dirty: true } }), false],
-    expect: _HEAD + ",\"shortcuts\":{\"panel\":\"\",\"video\":\"\",\"output\":\"\",\"dirty\":true}}" },
+      + ",\"shortcuts\":{\"panel\":\"SUPER + Y\",\"video\":\"\",\"output\":\"\"," + _LATER
+      + "\"dirty\":false,\"asked\":false}}" },
+  { fn: "serialize", args: [_state({ shortcuts: _keys({ dirty: true }) }), false],
+    expect: _HEAD + ",\"shortcuts\":{\"panel\":\"\",\"video\":\"\",\"output\":\"\"," + _LATER
+      + "\"dirty\":true,\"asked\":false}}" },
+  { fn: "serialize", args: [_state({ shortcuts: _keys({ asked: true }) }), false],
+    expect: _HEAD + ",\"shortcuts\":{\"panel\":\"\",\"video\":\"\",\"output\":\"\"," + _LATER
+      + "\"dirty\":false,\"asked\":true}}" },
   { fn: "serialize", args: [_state({ outputDevice: "alsa/default" }), false],
     expect: _HEAD + ",\"outputDevice\":\"alsa/default\"}" },
   { fn: "serialize",
@@ -533,10 +559,11 @@ var CASES = [
       + "\"channel\":\"<b>&amp;\",\"duration\":213,\"live\":false}],\"queue\":{\"items\":[],\"index\":-1}}" },
   // Shortcut texts are kept as they are, so they can hold anything.
   { fn: "serialize",
-    args: [_state({ shortcuts: { panel: "a\u007fb\u0001c\u0080", video: _LUA, output: "a\nb\tc",
-      dirty: false } }), false],
+    args: [_state({ shortcuts: _keys({ panel: "a\u007fb\u0001c\u0080", video: _LUA, output: "a\nb\tc" }) }),
+      false],
     expect: _HEAD + ",\"shortcuts\":{\"panel\":\"a\\u007fb\\u0001c\\u0080\","
-      + "\"video\":\"F1\\\") os.execute(\\\"x\",\"output\":\"a\\nb\\tc\",\"dirty\":false}}" },
+      + "\"video\":\"F1\\\") os.execute(\\\"x\",\"output\":\"a\\nb\\tc\"," + _LATER
+      + "\"dirty\":false,\"asked\":false}}" },
   { fn: "serialize", args: [_state({ outputDevice: "\u00e9\u4e16" }), false],
     expect: _HEAD + ",\"outputDevice\":\"\\u00e9\\u4e16\"}" },
 
@@ -618,7 +645,7 @@ var CASES = [
     args: [_DEFAULTS, { video: { constructor: { corner: "top-left", widthPct: 25 }, bad: { corner: "x" } } }],
     expect: _state({ video: { constructor: { corner: "top-left", widthPct: 25 } } }) },
   { fn: "withChanges", args: [_DEFAULTS, { shortcuts: { video: "SUPER + V", dirty: true } }],
-    expect: _state({ shortcuts: { panel: "", video: "SUPER + V", output: "", dirty: true } }) },
+    expect: _state({ shortcuts: _keys({ video: "SUPER + V", dirty: true }) }) },
   { fn: "withChanges", args: [_DEFAULTS, { outputDevice: "alsa/default" }],
     expect: _state({ outputDevice: "alsa/default" }) },
   { fn: "withChanges", args: [_state({ outputDevice: "alsa/default" }), { outputDevice: "a\nb" }],

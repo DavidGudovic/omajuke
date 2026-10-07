@@ -41,7 +41,10 @@ function rich() {
     video: {
       "DP-1": { corner: "bottom-right", widthPct: 25 }, constructor: { corner: "top-left", widthPct: 50 }
     },
-    shortcuts: { panel: "SUPER + Y", video: "SUPER + CTRL + ALT + V", output: "", dirty: true },
+    shortcuts: {
+      panel: "SUPER + Y", video: "SUPER + CTRL + ALT + V", output: "", playPause: "SUPER + CTRL + ALT + K",
+      next: "", previous: "", dirty: true, asked: true
+    },
     outputDevice: "alsa/default"
   })
 }
@@ -111,13 +114,14 @@ function assertValid(state, label) {
     assert.ok(Number.isInteger(place.widthPct) && place.widthPct >= 10 && place.widthPct <= 90, label)
   })
 
-  assert.deepStrictEqual(Object.keys(state.shortcuts), ["panel", "video", "output", "dirty"], label)
-  var combos = ["panel", "video", "output"]
+  var combos = ["panel", "video", "output", "playPause", "next", "previous"]
+  assert.deepStrictEqual(Object.keys(state.shortcuts), combos.concat(["dirty", "asked"]), label)
   combos.forEach(function(action) {
     assert.strictEqual(typeof state.shortcuts[action], "string", label)
     assert.ok(state.shortcuts[action].length <= 64, label)
   })
   assert.strictEqual(typeof state.shortcuts.dirty, "boolean", label)
+  assert.strictEqual(typeof state.shortcuts.asked, "boolean", label)
 
   assert.strictEqual(typeof state.outputDevice, "string", label)
   assert.ok(state.outputDevice.length <= 256, label)
@@ -183,7 +187,10 @@ function largest() {
   return StateFile.withChanges(StateFile.defaults(), {
     volume: 100, prefs: { rememberHistory: false, preload: false, autoplay: false },
     recents: recents, queue: { items: items, index: items.length - 1 }, video: video,
-    shortcuts: { panel: wide.repeat(64), video: wide.repeat(64), output: wide.repeat(64), dirty: false },
+    shortcuts: {
+      panel: wide.repeat(64), video: wide.repeat(64), output: wide.repeat(64), playPause: wide.repeat(64),
+      next: wide.repeat(64), previous: wide.repeat(64), dirty: false, asked: false
+    },
     outputDevice: wide.repeat(256)
   })
 }
@@ -197,7 +204,11 @@ test("the defaults are a complete, valid and fresh state", function() {
   assertValid(state, "defaults")
   assert.deepStrictEqual(plain(state), {
     volume: 70, muted: false, proxyAck: false, prefs: {}, recents: [], queue: { items: [], index: -1 },
-    video: {}, shortcuts: { panel: "", video: "", output: "", dirty: false }, outputDevice: ""
+    video: {},
+    shortcuts: {
+      panel: "", video: "", output: "", playPause: "", next: "", previous: "", dirty: false, asked: false
+    },
+    outputDevice: ""
   })
   state.recents.push(A)
   state.prefs.rememberHistory = false
@@ -263,11 +274,16 @@ test("titles in any script are written as escapes and survive", function() {
 
 test("no UTF-16 unit takes more than six bytes in the file", function() {
   var base = StateFile.serialize(StateFile.withChanges(StateFile.defaults(), {
-    shortcuts: { panel: "", video: "", output: "", dirty: true }
+    shortcuts: {
+      panel: "", video: "", output: "", playPause: "", next: "", previous: "", dirty: true, asked: false
+    }
   }), false).length
   for (var code = 0; code < 0x10000; code++) {
     var state = StateFile.withChanges(StateFile.defaults(), {
-      shortcuts: { panel: String.fromCharCode(code), video: "", output: "", dirty: true }
+      shortcuts: {
+        panel: String.fromCharCode(code), video: "", output: "", playPause: "", next: "", previous: "",
+        dirty: true, asked: false
+      }
     })
     var cost = StateFile.serialize(state, false).length - base
     assert.ok(cost >= 1 && cost <= 6, "U+" + code.toString(16) + " costs " + cost)
@@ -455,7 +471,10 @@ test("hostile shortcut texts survive only as inert strings", function() {
     }))
     assert.strictEqual(read.ok, true, text)
     assertValid(read.state, text)
-    assert.deepStrictEqual(read.state.shortcuts, { panel: text, video: text, output: text, dirty: false })
+    assert.deepStrictEqual(read.state.shortcuts, {
+      panel: text, video: text, output: text, playPause: "", next: "", previous: "", dirty: false,
+      asked: false
+    })
     // Nothing else in the state was touched by it.
     var rest = plain(read.state)
     rest.shortcuts = plain(StateFile.defaults().shortcuts)
@@ -605,7 +624,7 @@ test("a member that computes its value is never run", function() {
   assert.strictEqual(StateFile.withChanges(StateFile.defaults(), trapped), null)
   var inside = {
     prefs: trap({}, MIRRORED), queue: trap({}, ["items", "index"]), video: { "DP-1": trap({}, ["corner"]) },
-    shortcuts: trap({}, ["panel", "video", "output", "dirty"])
+    shortcuts: trap({}, ["panel", "video", "output", "playPause", "next", "previous", "dirty", "asked"])
   }
   assert.deepStrictEqual(plain(StateFile.withChanges(StateFile.defaults(), inside)),
     plain(StateFile.defaults()))
@@ -672,7 +691,10 @@ test("the caps hold on the way in, whatever is handed over", function() {
   assert.strictEqual(state.queue.items.length, Const.LIMITS.queueItems)
   assert.strictEqual(state.queue.index, Const.LIMITS.queueItems - 1)
   assert.strictEqual(Object.keys(state.video).length, 8)
-  assert.deepStrictEqual(state.shortcuts, { panel: "", video: "K".repeat(64), output: "", dirty: false })
+  assert.deepStrictEqual(state.shortcuts, {
+    panel: "", video: "K".repeat(64), output: "", playPause: "", next: "", previous: "", dirty: false,
+    asked: false
+  })
   assert.strictEqual(state.outputDevice, "")
   assert.strictEqual(state.recents[29].title, "t29")
   assert.strictEqual(state.queue.items[199].title, "t199")
