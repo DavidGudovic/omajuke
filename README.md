@@ -37,9 +37,15 @@ is no telemetry and no update check. [What it connects to](#what-it-connects-to)
 [What it stores](#what-it-stores) list every host and every file.
 
 **How far this version has been tested.** Every part has automated tests. They run against
-stand-ins for mpv, yt-dlp, curl, Hyprland and the browser, and make no network request. Searching
-and playing audio were also tried by hand against YouTube, in version 0.1.0. The following have
-not been tried by a person:
+stand-ins for mpv, yt-dlp, curl, Hyprland and the browser, and make no network request. Beyond
+those, the following were tried by hand on one machine, in a nested Hyprland 0.56.2 session with
+real YouTube streams: searching and playing, the queue, autoplay, next and previous through the
+media-key interface, the video window (where it appears, that it survives a track change and
+never takes focus), a shortcut being registered, surviving a reload, giving way to a bind of the
+user's own and being removed when the plugin is disabled, switching the audio output, and sponsor
+skipping against the real lookup service.
+
+The following have not been tried by a person:
 
 - **Sign-in has been tested only against a stand-in browser.** No real browser, Google account or
   YouTube session has been through it. Whether Google accepts a sign-in in the window OmaJuke
@@ -49,9 +55,10 @@ not been tried by a person:
   that is not 0.56.x OmaJuke sends Hyprland nothing: there is no video window, and a shortcut can
   only be set up by hand (see [Shortcuts](#shortcuts)). Recording a key of your own with
   **Change…** has not been tried on a real desktop.
-- Sponsor skipping has been tested against a stand-in for the lookup service only.
 - Losing the chosen audio output has been tested with made-up device lists, not by unplugging a
   device.
+- The pages added in this version (queue, shortcuts, audio outputs, account) are covered by the
+  automated tests but have not been looked at on a real screen.
 
 ## Requirements
 
