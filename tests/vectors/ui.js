@@ -1127,6 +1127,54 @@ var CASES = [
   { fn: "accountOffer", args: ["idle", "", true], expect: false },
   { fn: "accountOffer", args: [null, null, true], expect: false },
 
+  // ---- rowTitle ----
+  { fn: "rowTitle", args: [{ id: "AAAAAAAAAAA", title: "A title", channel: "C", duration: 9, live: false }],
+    expect: "A title" },
+  { fn: "rowTitle", args: [{ id: "AAAAAAAAAAA", title: "", channel: "", duration: null, live: true }],
+    expect: "youtu.be/AAAAAAAAAAA" },
+  { fn: "rowTitle", args: [{ id: "AAAAAAAAAAA" }], expect: "youtu.be/AAAAAAAAAAA" },
+  { fn: "rowTitle", args: [{ id: "AAAAAAAAAAA", title: 7 }], expect: "youtu.be/AAAAAAAAAAA" },
+  { fn: "rowTitle", args: [{ id: "", title: "Playlist of mine" }], expect: "Playlist of mine" },
+  { fn: "rowTitle", args: [{ id: "", title: "" }], expect: "" },
+  { fn: "rowTitle", args: [{ title: "No id" }], expect: "" },
+  { fn: "rowTitle", args: [null], expect: "" },
+  { fn: "rowTitle", args: ["AAAAAAAAAAA"], expect: "" },
+
+  // ---- topNotice ----
+  { fn: "topNotice", args: [false, false, false, false], expect: "" },
+  { fn: "topNotice", args: [true, true, true, true], expect: "account" },
+  { fn: "topNotice", args: [false, true, true, true], expect: "service" },
+  { fn: "topNotice", args: [false, false, true, true], expect: "output" },
+  { fn: "topNotice", args: [false, false, false, true], expect: "sponsor" },
+  { fn: "topNotice", args: [true, false, false, false], expect: "account" },
+  { fn: "topNotice", args: [false, true, false, true], expect: "service" },
+  { fn: "topNotice", args: [false, true, false, false], expect: "service" },
+  { fn: "topNotice", args: [false, false, true, false], expect: "output" },
+  { fn: "topNotice", args: [1, "yes", {}, "true"], expect: "" },
+  { fn: "topNotice", args: [null, null, null, null], expect: "" },
+
+  // ---- listHeight ----
+  // Seven rows and room for them.
+  { fn: "listHeight", args: [334, 94, 334, 608, 181], expect: 334 },
+  // More rows than fit: seven are shown.
+  { fn: "listHeight", args: [960, 94, 334, 608, 181], expect: 334 },
+  // A notice took room: the list gives way, by exactly what is missing.
+  { fn: "listHeight", args: [960, 94, 334, 608, 300], expect: 308 },
+  { fn: "listHeight", args: [334, 94, 334, 608, 300.5], expect: 307 },
+  // Few rows need no more than they are tall, but never under two rows.
+  { fn: "listHeight", args: [142, 94, 334, 608, 300], expect: 142 },
+  { fn: "listHeight", args: [46, 94, 334, 608, 181], expect: 94 },
+  { fn: "listHeight", args: [0, 94, 334, 608, 181], expect: 94 },
+  // No room at all: two rows stay, and the page scrolls.
+  { fn: "listHeight", args: [960, 94, 334, 300, 280], expect: 94 },
+  { fn: "listHeight", args: [960, 94, 334, 120, 400], expect: 94 },
+  // The limit is not known: only the rows and the cap count.
+  { fn: "listHeight", args: [960, 94, 334, 0, 181], expect: 334 },
+  { fn: "listHeight", args: [142, 94, 334, 0, 9999], expect: 142 },
+  { fn: "listHeight", args: [960, 94, 334, null, null], expect: 334 },
+  { fn: "listHeight", args: [960, 94, 334, -5, 181], expect: 334 },
+  { fn: "listHeight", args: [null, 94, 334, 608, 181], expect: 94 },
+
   // ---- barIcon ----
   { fn: "barIcon", args: [false, ""], expect: { active: false, dimmed: true } },
   { fn: "barIcon", args: [false, "playing"], expect: { active: false, dimmed: true } },

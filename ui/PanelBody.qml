@@ -29,6 +29,9 @@ Item {
   property bool opened: false
   // Open or still fading out. The page lives as long as this is true.
   property bool showing: false
+  // The tallest this item can be made, 0 when that is not known. The main
+  // page fits its list into it, so that nothing under the list is cut.
+  property real heightLimit: 0
 
   // ---- State of this panel, reset on open ----
 
@@ -196,8 +199,20 @@ Item {
     // The rows have the keyboard from here on: Space is play or pause now,
     // not a character.
     if (typing) keyRouter.forceActiveFocus()
+    root._showEdge()
     pointerGate.reset()
     root.cursorSteered()
+  }
+
+  // The first row brings the top of the page into view with it, and the
+  // last row the end: what stands above the first row (the page's heading)
+  // and under the last (a closing line) is no row, and the keyboard would
+  // otherwise never scroll that far back.
+  function _showEdge() {
+    var limit = flick.contentHeight - flick.height
+    if (limit <= 0 || !root.cursorActive || root.noticeIndex !== -1) return
+    if (root.selectedIndex === 0) flick.contentY = 0
+    else if (root.selectedIndex === root.rowCount - 1) flick.contentY = limit
   }
 
   // Presses the button of a notice, for a click on it and for Enter while
@@ -411,9 +426,13 @@ Item {
         // Active through the fade-out as well: destroying the page at the
         // moment of close would shrink the card while it fades. After that
         // a closed panel holds no rows, no images and no bindings on lists.
+        // The height is said outright: a Loader keeps the size of a page
+        // it has unloaded, and the card would stay as tall as the page
+        // that is gone around the one message that took its place.
         Loader {
           id: pageLoader
           width: parent.width
+          height: item ? item.implicitHeight : 0
           active: root.showing && root.blocker === ""
           sourceComponent: root.page === "settings" ? settingsPage
             : (root.page === "queue" ? queuePage

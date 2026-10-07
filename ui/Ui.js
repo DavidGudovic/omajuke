@@ -16,7 +16,7 @@
 // running service: a difference means the plugin was updated and the shell
 // not yet restarted, and the view then shows the restart notice and nothing
 // else.
-var VERSION = "0.2.0"
+var VERSION = "0.2.1"
 
 // ---- Glyphs ----
 
@@ -117,6 +117,7 @@ var TEXT = {
   RECENT: "RECENTLY PLAYED",
   QUEUE: "QUEUE",
   LIVE: "LIVE",
+  LINK: "youtu.be/",
   SETTINGS: "Settings",
   BACK: "Back",
   DISMISS: "Dismiss",
@@ -678,6 +679,39 @@ function listArea(linkNotice, searchState, rowCount, feedState) {
   return { line: "", list: true, dim: false }
 }
 
+// What a row shows as the title of a track. A track that was queued from a
+// link has no title until it is looked up, which happens when its turn
+// comes: until then the row names the link.
+function rowTitle(track) {
+  if (!_isTrack(track)) return ""
+  if (typeof track.title === "string" && track.title !== "") return track.title
+  return track.id !== "" ? TEXT.LINK + track.id : ""
+}
+
+// Which notice the main page shows, "" for none. Only one shows at a time,
+// so that the list and the now-playing strip keep their room; the next one
+// appears when this one is answered or its reason is gone. First comes what
+// waits for a decision about the track that just failed ("account"), then
+// what the service has to tell ("service"), then that the chosen output is
+// gone ("output"), and last the question that can wait ("sponsor").
+function topNotice(account, service, output, sponsor) {
+  if (account === true) return "account"
+  if (service === true) return "service"
+  if (output === true) return "output"
+  return sponsor === true ? "sponsor" : ""
+}
+
+// How tall the main page's list is: as tall as its rows (content), at
+// least `least` and at most `most`, and no taller than what the card has
+// left for it. limit is the tallest the page can be (0 when that is not
+// known) and around is what everything else on the page takes. The list is
+// the part that gives way: the now-playing strip under it is never cut.
+function listHeight(content, least, most, limit, around) {
+  var number = function(value) { return typeof value === "number" && isFinite(value) ? value : 0 }
+  var room = number(limit) > 0 ? Math.floor(number(limit) - number(around)) : number(most)
+  return Math.max(number(least), Math.min(number(content), number(most), room))
+}
+
 // The local file of a thumbnail, or "" when there is none yet. thumbs is the
 // service's table of video id to file path. Only an absolute path counts
 // (one slash: two would start a host name), so whatever the table holds, an
@@ -951,6 +985,9 @@ if (typeof module !== "undefined") {
     feedRows: feedRows,
     indexOfKey: indexOfKey,
     listArea: listArea,
+    rowTitle: rowTitle,
+    topNotice: topNotice,
+    listHeight: listHeight,
     thumbPath: thumbPath,
     stripLine: stripLine,
     recentSkip: recentSkip,

@@ -252,7 +252,6 @@ var CASES = [
   { fn: "isSkipClass", args: ["E_LINK"], expect: false },
   { fn: "isSkipClass", args: ["N_PROXY"], expect: false },
   { fn: "isSkipClass", args: ["N_STATE_RESET"], expect: false },
-  { fn: "isSkipClass", args: ["N_NO_RELATED"], expect: false },
   { fn: "isSkipClass", args: ["N_SKIPPED"], expect: false },
   { fn: "isSkipClass", args: ["E_VIDEO_NONE"], expect: false },
   { fn: "isSkipClass", args: ["E_HYPR_VERSION"], expect: false },

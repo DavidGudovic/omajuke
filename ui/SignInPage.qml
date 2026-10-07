@@ -247,7 +247,9 @@ Item {
           bordered: true
           enabled: root.usable(button.modelData)
           opacity: button.enabled ? 1 : 0.45
-          foreground: root.fg
+          // Lettered in the accent colour under the cursor, like every
+          // framed button of the panel.
+          foreground: button.hasCursor ? Color.accent : root.fg
           fontFamily: root.fontFamily
           hasCursor: root.cursorOnRow && root.body.selectedIndex === button.index
           onHasCursorChanged: if (button.hasCursor && root.body) root.body.ensureVisible(button)

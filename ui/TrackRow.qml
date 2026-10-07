@@ -25,9 +25,13 @@ CursorSurface {
   property string actionIcon: ""
   property string actionTip: ""
 
-  readonly property string title: track && typeof track.title === "string" ? track.title : ""
+  // A track queued from a link is known by its id alone until its turn
+  // comes: the row then names the link, and says nothing about its length,
+  // which nobody knows yet.
+  readonly property bool known: track && typeof track.title === "string" ? track.title !== "" : false
+  readonly property string title: Ui.rowTitle(track)
   readonly property string channel: track && typeof track.channel === "string" ? track.channel : ""
-  readonly property bool live: track ? track.live === true : false
+  readonly property bool live: track ? root.known && track.live === true : false
   readonly property string runtime: track && !live ? Ui.duration(track.duration) : ""
 
   signal activated()

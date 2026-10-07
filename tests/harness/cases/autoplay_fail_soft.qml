@@ -1,12 +1,12 @@
 import QtQuick
 
-// Autoplay must never cost more than a notice. In core/Playback.qml,
-// against scripted parts: whatever the source of related tracks answers
-// (an error, nothing, something that is no list, an answer that comes
-// twice or too late), the track that plays goes on, the queue stays as it
-// is and "No related tracks found" is all the user sees. And when the
-// tracks autoplay adds keep failing, it rests until the user plays
-// something.
+// Autoplay must never cost anything. In core/Playback.qml, against
+// scripted parts: whatever the source of related tracks answers (an error,
+// nothing, something that is no list, an answer that comes twice or too
+// late), the track that plays goes on, the queue stays as it is and the
+// user is told nothing: nobody asked for related tracks, and a video
+// without any is no news. And when the tracks autoplay adds keep failing,
+// it rests until the user plays something.
 QtObject {
   id: root
 
@@ -16,7 +16,7 @@ QtObject {
     root.h = h
     var rows = [
       root.failuresWhilePlaying, root.aCancelledQuestion, root.answeredTwice, root.failureAfterTheEnd,
-      root.theNotice, root.aSourceThatAnswersAtOnce, root.restingAfterThreeFailures
+      root.afterAFailure, root.aSourceThatAnswersAtOnce, root.restingAfterThreeFailures
     ]
     for (var i = 0; i < rows.length; i++) rows[i]()
     root.quietLog()
@@ -124,7 +124,7 @@ QtObject {
     for (var i = 0; i < answers.length; i++) {
       var r = root.asking()
       r.mix.waiting.shift()(answers[i][1])
-      h.equal(r.playback.noticeCode, "N_NO_RELATED", answers[i][0] + ": the notice")
+      h.equal(r.playback.noticeCode, "", answers[i][0] + ": no notice")
       h.equal(root.untouched(r), root.asBefore, answers[i][0] + ": and nothing else")
       // Playing goes on to its end as if nothing had been asked.
       r.player.ended(r.playback.current.key, "eof", "")
@@ -146,7 +146,6 @@ QtObject {
     var r = root.asking()
     var done = r.mix.waiting.shift()
     done({ ok: false, code: "E_NETWORK" })
-    r.playback.dismissNotice()
     done({ ok: true, code: "", tracks: [root.track("B")] })
     h.equal([r.playback.noticeCode, r.playback.queue.length], ["", 2],
       "twice: the first answer after a failure counts")
@@ -164,27 +163,24 @@ QtObject {
     r.resolver.clearCalls()
     r.states.length = 0
     r.mix.waiting.shift()({ ok: false, code: "E_NETWORK" })
-    h.equal([r.playback.status, r.playback.errorCode, r.playback.noticeCode], ["idle", "", "N_NO_RELATED"],
-      "after the end: the notice, and playing stays over")
+    h.equal([r.playback.status, r.playback.errorCode, r.playback.noticeCode], ["idle", "", ""],
+      "after the end: no notice, and playing stays over")
     h.equal([r.player.calls, r.resolver.calls, r.states, r.playback.queue.length], [[], [], [], 1],
       "after the end: nothing is started")
   }
 
-  function theNotice() {
+  function afterAFailure() {
     var h = root.h
-    var r = root.asking()
-    r.mix.waiting.shift()({ ok: false, code: "E_NETWORK" })
-    r.playback.dismissNotice()
-    h.equal(r.playback.noticeCode, "", "notice: it can be dismissed")
     var again = root.asking()
     again.mix.waiting.shift()({ ok: false, code: "E_NETWORK" })
     again.playback.playTrack(root.track("B"))
-    h.equal(again.playback.noticeCode, "", "notice: and it goes with the next thing the user plays")
-    // A notice is not an error: the transport still answers.
+    h.equal([again.playback.status === "idle", again.playback.noticeCode], [false, ""],
+      "after a failure: the next thing the user plays starts like any other")
+    // Nothing went wrong for the track that plays: the transport answers.
     var live = root.asking()
     live.mix.waiting.shift()({ ok: false, code: "E_NETWORK" })
-    h.check(live.playback.playPause(), "notice: pause still works")
-    h.equal(live.player.names(), ["setPause"], "notice: and reaches the player")
+    h.check(live.playback.playPause(), "after a failure: pause still works")
+    h.equal(live.player.names(), ["setPause"], "after a failure: and reaches the player")
   }
 
   // Nothing here depends on the answer coming later than the question.
@@ -200,8 +196,8 @@ QtObject {
     }
     r.playback.playTrack(root.track("A"))
     root.start(r)
-    h.equal([r.playback.status, r.playback.noticeCode, asked], ["playing", "N_NO_RELATED", [root.id("A")]],
-      "at once: a failure inside the call is the same notice")
+    h.equal([r.playback.status, r.playback.noticeCode, asked], ["playing", "", [root.id("A")]],
+      "at once: a failure inside the call is as silent")
 
     var good = root.rig()
     good.playback.mixer = {
@@ -223,7 +219,7 @@ QtObject {
     broken.playback.playTrack(root.track("A"))
     root.start(broken)
     h.equal([broken.playback.status, broken.playback.errorCode, broken.playback.noticeCode, announced],
-      ["playing", "", "N_NO_RELATED", [root.id("A")]], "at once: a source that throws costs the same notice")
+      ["playing", "", "", [root.id("A")]], "at once: a source that throws costs nothing either")
   }
 
   // What the set-up of the last two rows shares: the first track plays,

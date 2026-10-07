@@ -73,8 +73,8 @@ Item {
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
-      anchors.leftMargin: frame.borderLeft + Style.space(10)
-      anchors.rightMargin: frame.borderRight + Style.space(10)
+      anchors.leftMargin: frame.borderLeft + Style.spacing.rowPaddingX
+      anchors.rightMargin: frame.borderRight + Style.spacing.rowPaddingX
       spacing: Style.space(8)
 
       Text {

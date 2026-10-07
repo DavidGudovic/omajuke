@@ -349,7 +349,9 @@ Item {
                 bordered: true
                 enabled: button.modelData.enabled
                 opacity: button.enabled ? 1 : 0.45
-                foreground: root.fg
+                // Lettered in the accent colour under the cursor, so that
+                // it is plain which button of the row Enter presses.
+                foreground: button.hasCursor ? Color.accent : root.fg
                 fontFamily: root.fontFamily
                 fontSize: Style.font.bodySmall
                 hasCursor: row.hasCursor && root.buttonIndex === button.index

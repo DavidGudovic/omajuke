@@ -670,7 +670,9 @@ Item {
   }
 
   // The related tracks arrived, or did not. Whatever goes wrong here costs
-  // a notice and nothing else: what plays is never touched.
+  // nothing: what plays is never touched, and nothing is said, because
+  // nobody asked for this and many a video simply has no related tracks.
+  // The queue then ends with the track that plays.
   function _mixed(request, key, id, result) {
     if (request !== root._mixRequest) return
     var resume = root._mixResume
@@ -692,10 +694,7 @@ Item {
     var added = answer.ok === true
       ? Queue.appendAuto(list.items, list.index, answer.tracks, root._played.concat([id]), root._nextKey)
       : { ok: false }
-    if (added.ok !== true) {
-      root._noticeCode = "N_NO_RELATED"
-      return
-    }
+    if (added.ok !== true) return
     root._nextKey = added.nextKey
     root._setList(added.queue, added.index)
     // The item ended while its related tracks were on their way, and the

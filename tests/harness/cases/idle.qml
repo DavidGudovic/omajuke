@@ -129,9 +129,16 @@ QtObject {
   function stoppedUnderAPanel() {
     var h = root.h
     var s = h.service
-    h.shell.panelShown = true
+    // As under a real bar: the panel reports itself, and its page asks for
+    // the position and for a picture, before the host counts the panel as
+    // open. Asked at that moment the host says that none is, and the panel
+    // that is opening must not be written off for it.
     s.notePanelOpen(true)
+    s.wantThumbs([root.idC])
     s.setPositionWatch(true)
+    s.wantThumbs([root.idC])
+    h.equal(s.panelOpen, true, "under a panel: it counts as open while the host has yet to hear of it")
+    h.shell.panelShown = true
     root.plays("under a panel", root.idA, function() {
       s.wantThumbs([root.idA])
       root.until("under a panel: the picture arrives", function() {

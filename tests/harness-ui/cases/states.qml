@@ -163,9 +163,8 @@ QtObject {
         var turning = root.glyph(0xf0996)
         var spinner = h.find(root.body, function(item) { return item.text === turning && item.visible })
         h.check(spinner !== null, "searching: with the turning glyph")
-        var list = h.find(root.body, root.isList)
-        h.equal(list.visible, true, "searching: the list area is kept")
-        h.equal(list.opacity, 0.5, "searching: dimmed")
+        h.equal(h.find(root.body, root.isList).visible, false,
+          "searching: a first search has no rows to keep, and no empty block stands in for them")
         h.mock.searchState = "empty"
       },
       function() {
@@ -232,6 +231,16 @@ QtObject {
         h.equal(h.calls("reportThumbError"), [], "thumbnails: and is not an error to report either")
         h.mock.thumbs = {}
 
+        // Another search over these results.
+        h.mock.searchState = "searching"
+      },
+      function() {
+        var list = h.find(root.body, root.isList)
+        h.check(root.shown(h, "Searching…") && root.shown(h, "A result"),
+          "searching again: the earlier results stay under the line")
+        h.equal([list.visible, list.opacity], [true, 0.5], "searching again: dimmed")
+        h.mock.searchState = "results"
+
         // A notice the user dismisses.
         h.mock.noticeCode = "N_STATE_RESET"
       },
@@ -257,12 +266,17 @@ QtObject {
         h.check(root.iconButton(h, 0xf0996) !== null, "strip: the play button turns")
         h.check(h.calls("wantThumbs").some(function(args) { return args[0][0] === "AAAAAAAAAAA" }),
           "strip: the current track's thumbnail is requested")
+        // What the player told last is about the track before this one.
+        h.mock.position = 52
         h.mock.playbackState = "error"
         h.mock.errorCode = "E_YT_REFUSED"
       },
       function() {
         h.check(root.shown(h, "text of E_YT_REFUSED"), "strip: the error line is what errorText answered")
         h.check(!root.shown(h, "Loading…"), "strip: instead of Loading")
+        h.check(root.shown(h, "0:00") && !root.shown(h, "0:52"),
+          "strip: a track that is not in the player stands at its start")
+        h.equal(h.findAll(root.body, root.isSlider)[0].value, 0, "strip: and so does its seek bar")
         h.mock.errorCode = ""
         h.mock.playbackState = "playing"
         h.mock.playing = true

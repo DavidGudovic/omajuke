@@ -6,7 +6,7 @@ import qs.Commons
 import qs.Ui
 import "Ui.js" as Ui
 
-// The panel's main page: the search field, the notices, while signed in the
+// The panel's main page: the search field, a notice, while signed in the
 // chips that pick one of the account's lists, the title of a playlist that
 // was opened from them, the list (search results, or else such a list, or
 // else what is queued and what was played recently), and the now-playing
@@ -96,11 +96,27 @@ Item {
     ? String(service.errorText("E_NEEDS_ACCOUNT") || "") + ". " + Ui.TEXT.ACCOUNT_ASK : ""
   // The question whether to skip sponsor segments waits for an answer.
   readonly property bool sponsorPrompt: service ? service.sponsorPrompt === true : false
+  // The one notice that shows. The others wait their turn behind it, so
+  // that the list and the strip keep their room.
+  readonly property string notice: Ui.topNotice(accountOffer, noticeCode !== "", outputNote !== "",
+    sponsorPrompt)
   // The now-playing strip is on screen.
   readonly property bool stripShown: service ? service.hasTrack === true : false
+  // What everything on the page but the list takes of its height, with the
+  // gaps between. The list gets what the card has left beside it.
+  readonly property real aroundList: {
+    var total = 0
+    var parts = column.children
+    for (var i = 0; i < parts.length; i++) {
+      if (parts[i] !== list && parts[i].visible && parts[i].height > 0) {
+        total += parts[i].height + column.spacing
+      }
+    }
+    return total
+  }
   // The places the cursor can visit beside the rows of the list, in the
   // order Up and Down go through them. Above the first row lie, from the
-  // top of the page down: the settings button, the buttons of the notices
+  // top of the page down: the settings button, the buttons of the notice
   // on screen and the row of feed chips, which is one place (Left and Right
   // pick the chip there). One more Up from the settings button leads round
   // to the bottom of the page, to the buttons of the now-playing strip,
@@ -110,10 +126,10 @@ Item {
     var names = []
     if (root.stripShown) names.push("controls")
     names.push("settings")
-    if (root.noticeCode !== "") names.push("dismiss")
-    if (root.accountOffer) names.push("account")
-    if (root.outputNote !== "") names.push("outputs")
-    if (root.sponsorPrompt) names.push("sponsorOn", "sponsorOff")
+    if (root.notice === "account") names.push("account")
+    else if (root.notice === "service") names.push("dismiss")
+    else if (root.notice === "output") names.push("outputs")
+    else if (root.notice === "sponsor") names.push("sponsorOn", "sponsorOff")
     if (root.chipsShown) names.push("feeds")
     return names
   }
@@ -476,16 +492,21 @@ Item {
         foreground: root.fg
         fontFamily: root.fontFamily
         hasCursor: root.noticeCursor === "settings"
+        // With the cursor it is framed like a row that has it.
+        bordered: root.noticeCursor === "settings"
         onClicked: root.answerNotice("settings")
       }
     }
 
     // ---- Notices ----
+    //
+    // One at a time (root.notice): each of them is as tall as its sentence
+    // needs, and together they would take the room of the list.
 
     Notice {
       id: serviceNotice
       width: parent.width
-      visible: root.noticeCode !== ""
+      visible: root.notice === "service"
       text: root.noticeText
       primaryLabel: Ui.TEXT.DISMISS
       cursor: root.noticeCursor === "dismiss" ? "primary" : ""
@@ -500,7 +521,7 @@ Item {
     Notice {
       id: accountNotice
       width: parent.width
-      visible: root.accountOffer
+      visible: root.notice === "account"
       text: root.accountText
       primaryLabel: Ui.TEXT.ACCOUNT_PLAY
       cursor: root.noticeCursor === "account" ? "primary" : ""
@@ -514,7 +535,7 @@ Item {
     Notice {
       id: outputNotice
       width: parent.width
-      visible: root.outputNote !== ""
+      visible: root.notice === "output"
       text: root.outputNoteText
       primaryLabel: Ui.TEXT.OUTPUT_CHOOSE
       cursor: root.noticeCursor === "outputs" ? "primary" : ""
@@ -528,7 +549,7 @@ Item {
     Notice {
       id: sponsorNotice
       width: parent.width
-      visible: root.sponsorPrompt
+      visible: root.notice === "sponsor"
       text: Ui.TEXT.SPONSOR_ASK
       primaryLabel: Ui.TEXT.SPONSOR_ENABLE
       secondaryLabel: Ui.TEXT.SPONSOR_DECLINE
@@ -596,9 +617,14 @@ Item {
     ListView {
       id: list
       width: parent.width
-      // Between two and seven rows.
-      height: Math.max(Style.space(94), Math.min(contentHeight, Style.space(334)))
-      visible: root.area.list
+      // Between two and seven rows, and fewer than seven where a notice,
+      // the chips or a small screen leave less room: the list gives way and
+      // scrolls, the strip under it stays whole.
+      height: Ui.listHeight(contentHeight, Style.space(94), Style.space(334),
+        root.body ? root.body.heightLimit : 0, root.aroundList)
+      // Without rows it would be two rows of nothing: a first search has no
+      // earlier results to show dimmed while it runs.
+      visible: root.area.list && root.rows.length > 0
       opacity: root.area.dim ? 0.5 : 1
       spacing: Style.space(2)
       clip: true

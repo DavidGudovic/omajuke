@@ -282,11 +282,13 @@ Item {
 
     // The video window is put back where it was last left on each monitor.
     // This forgets those places, so that size and corner above decide again.
+    // Like every framed button of the panel it is lettered in the accent
+    // colour while it has the cursor.
     Button {
       id: resetRow
       text: Ui.TEXT.VIDEO_RESET
       bordered: true
-      foreground: root.fg
+      foreground: resetRow.hasCursor ? Color.accent : root.fg
       fontFamily: root.fontFamily
       hasCursor: root.cursorRow === "resetVideo"
       onHasCursorChanged: if (hasCursor && root.body) root.body.ensureVisible(resetRow)
@@ -326,7 +328,7 @@ Item {
       id: shortcutsRow
       text: Ui.TEXT.SHORTCUTS_OPEN
       bordered: true
-      foreground: root.fg
+      foreground: shortcutsRow.hasCursor ? Color.accent : root.fg
       fontFamily: root.fontFamily
       hasCursor: root.cursorRow === "shortcuts"
       onHasCursorChanged: if (hasCursor && root.body) root.body.ensureVisible(shortcutsRow)
@@ -351,7 +353,7 @@ Item {
       id: accountRow
       text: root.signedIn ? Ui.TEXT.SIGNOUT_OPEN : Ui.TEXT.SIGNIN_OPEN
       bordered: true
-      foreground: root.fg
+      foreground: accountRow.hasCursor ? Color.accent : root.fg
       fontFamily: root.fontFamily
       hasCursor: root.cursorRow === "account"
       onHasCursorChanged: if (hasCursor && root.body) root.body.ensureVisible(accountRow)
@@ -409,7 +411,7 @@ Item {
       id: clearRow
       text: Ui.TEXT.CLEAR_HISTORY
       bordered: true
-      foreground: root.fg
+      foreground: clearRow.hasCursor ? Color.accent : root.fg
       fontFamily: root.fontFamily
       hasCursor: root.cursorRow === "clearHistory"
       onHasCursorChanged: if (hasCursor && root.body) root.body.ensureVisible(clearRow)

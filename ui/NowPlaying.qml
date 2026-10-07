@@ -9,7 +9,7 @@ import "Ui.js" as Ui
 // and the queue). It shows the service's playback state and calls the
 // service; it keeps no state of its own. Its buttons take no keyboard
 // focus: the panel moves its one cursor onto the strip and says here which
-// button carries it.
+// button carries it. That one is framed like a row that has the cursor.
 Column {
   id: root
 
@@ -28,15 +28,25 @@ Column {
   // Every read of the service is guarded: it can go away at any moment.
   readonly property var track: service ? service.currentTrack : null
   readonly property string trackId: track && typeof track.id === "string" ? track.id : ""
-  readonly property string title: track && typeof track.title === "string" ? track.title : ""
+  // A track started from a link is known by its id alone until it is looked
+  // up: until then the strip names the link, and calls nothing live.
+  readonly property bool known: track && typeof track.title === "string" ? track.title !== "" : false
+  readonly property string title: Ui.rowTitle(track)
   readonly property string channel: track && typeof track.channel === "string" ? track.channel : ""
-  readonly property bool live: track ? track.live === true : false
+  readonly property bool live: track ? root.known && track.live === true : false
   readonly property string playbackState: service ? service.playbackState : "idle"
   readonly property bool starting: playbackState === "resolving" || playbackState === "loading"
   readonly property bool busy: starting || playbackState === "buffering"
   readonly property bool sounding: service ? service.playing === true : false
   readonly property bool failed: playbackState === "error"
-  readonly property real position: service ? service.position : 0
+  // The track is in the player: it plays, is paused or waits for more of
+  // itself. Only then is the player's position this track's. Before that,
+  // and for a track that failed or was stopped, the strip shows the start:
+  // what the player told last belongs to the track before, and Play begins
+  // at the start whatever it was.
+  readonly property bool loaded: playbackState === "playing" || playbackState === "paused"
+    || playbackState === "buffering"
+  readonly property real position: service && loaded ? service.position : 0
   readonly property real duration: service ? service.duration : 0
   readonly property bool seekable: service ? service.seekable === true : false
   readonly property int volume: service ? service.volume : 0
@@ -123,7 +133,7 @@ Column {
 
   Item {
     width: parent.width
-    height: thumb.height
+    height: Math.max(thumb.height, labels.implicitHeight)
 
     Thumb {
       id: thumb
@@ -137,6 +147,7 @@ Column {
     }
 
     Column {
+      id: labels
       anchors.left: thumb.right
       anchors.leftMargin: Style.space(8)
       anchors.right: parent.right
@@ -163,6 +174,10 @@ Column {
         color: root.failed ? root.urgent : Qt.darker(root.fg, 1.5)
         font.family: root.fontFamily
         font.pixelSize: Style.font.bodySmall
+        // Why a track failed is a sentence, and it is read to its end: it
+        // may take a second line. A channel name is cut at the first.
+        wrapMode: Text.WordWrap
+        maximumLineCount: root.line === "channel" ? 1 : 2
         elide: Text.ElideRight
       }
     }
@@ -286,6 +301,7 @@ Column {
         foreground: root.fg
         fontFamily: root.fontFamily
         hasCursor: root._carries("mute")
+        bordered: root._carries("mute")
         onClicked: root.press("mute")
       }
 
@@ -312,6 +328,7 @@ Column {
         hoverColor: foreground
         fontFamily: root.fontFamily
         hasCursor: root._carries("video")
+        bordered: root._carries("video")
         onClicked: root.press("video")
       }
 
@@ -323,6 +340,7 @@ Column {
         hoverColor: foreground
         fontFamily: root.fontFamily
         hasCursor: root._carries("outputs")
+        bordered: root._carries("outputs")
         onClicked: root.press("outputs")
       }
 
@@ -333,6 +351,7 @@ Column {
         foreground: root.fg
         fontFamily: root.fontFamily
         hasCursor: root._carries("queue")
+        bordered: root._carries("queue")
         onClicked: root.press("queue")
       }
     }

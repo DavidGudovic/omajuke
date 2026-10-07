@@ -624,11 +624,13 @@ var LAYOUT = {
     "ui/KeyCapture.qml", "ui/SignInPage.qml", "ui/FeedChips.qml",
     "tests/harness-ui/cases/queue_page.qml", "tests/harness-ui/cases/video_output.qml",
     "tests/harness-ui/cases/shortcuts_page.qml", "tests/harness-ui/cases/signin_page.qml",
-    "tests/harness-ui/cases/feeds_sponsor.qml", "tests/harness-ui/cases/account_retry.qml"
+    "tests/harness-ui/cases/feeds_sponsor.qml", "tests/harness-ui/cases/account_retry.qml",
+    "tests/harness-ui/cases/layout.qml"
   ],
   "service and documents": [
     "Service.qml", "core/Playback.qml", "lib/Recover.js", "manifest.json", "README.md", "SECURITY.md",
-    "LICENSE", "NOTICE", "CHANGELOG.md", "tests/harness/FakePlayer.qml", "tests/harness/FakeResolver.qml",
+    "LICENSE", "NOTICE", "CHANGELOG.md", "preview.png", "tests/harness/FakePlayer.qml",
+    "tests/harness/FakeResolver.qml",
     "tests/node/recover.test.js", "tests/harness/cases/playback_table.qml",
     "tests/harness/cases/play_basic.qml", "tests/harness/cases/play_error.qml",
     "tests/harness/cases/play_recover.qml", "tests/harness/cases/transport.qml",

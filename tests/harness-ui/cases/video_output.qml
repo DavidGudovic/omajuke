@@ -277,12 +277,12 @@ QtObject {
         h.mock.outputNote = "N_OUTPUT_FALLBACK"
       },
       function() {
-        h.equal(h.findAll(root.body, root.isNotice).length, 2, "notices: one per condition")
-        h.check(root.shown(h, "text of N_SKIPPED") && root.shown(h, "text of N_OUTPUT_FALLBACK"),
-          "notices: each with the service's sentence")
-        h.check(root.button(h, "Dismiss") !== null && root.button(h, "Choose output") !== null,
-          "notices: and its button")
-        h.equal(root.pressed(h), [], "notices: no button is highlighted when they appear")
+        h.equal(h.findAll(root.body, root.isNotice).length, 1, "notices: one at a time")
+        h.check(root.shown(h, "text of N_SKIPPED") && !root.shown(h, "text of N_OUTPUT_FALLBACK"),
+          "notices: what the service has to tell comes first, the note about the output waits")
+        h.check(root.button(h, "Dismiss") !== null && root.button(h, "Choose output") === null,
+          "notices: with its button")
+        h.equal(root.pressed(h), [], "notices: no button is highlighted when one appears")
         h.check(root.field(h).activeFocus, "notices: the field keeps the keyboard")
         h.resetCalls()
 
@@ -290,40 +290,46 @@ QtObject {
         h.equal([root.highlighted(h), root.pressed(h)], [["Recent one"], []],
           "notices: the first Down shows the highlight on a row, not on a button")
         h.key(Qt.Key_Up)
-        h.equal([root.highlighted(h), root.pressed(h)], [[], ["Choose output"]],
-          "notices: Up from the first row reaches the button nearest to it")
-        h.key(Qt.Key_Up)
-        h.equal(root.pressed(h), ["Dismiss"], "notices: Up again reaches the one above")
+        h.equal([root.highlighted(h), root.pressed(h)], [[], ["Dismiss"]],
+          "notices: Up from the first row reaches the button of the notice")
+        h.check(String(root.button(h, "Dismiss").foreground) !== String(root.body.fg),
+          "notices: which is lettered in another colour while it has the cursor")
         h.key(Qt.Key_Up)
         h.equal([root.pressed(h), root.carried(h)], [[], ["Settings"]],
-          "notices: above the notices lies the settings button")
+          "notices: above the notice lies the settings button")
+        h.check(root.tipButton(h, "Settings").bordered === true,
+          "notices: framed while it has the cursor")
+        h.equal(String(root.button(h, "Dismiss").foreground), String(root.body.fg),
+          "notices: and the button it left is lettered as before")
         h.key(Qt.Key_Down)
         h.equal([root.pressed(h), root.carried(h)], [["Dismiss"], []],
-          "notices: and Down returns from it to the first notice")
+          "notices: and Down returns from it to the notice")
+        h.check(root.tipButton(h, "Settings").bordered === false, "notices: the frame went with the cursor")
         h.key(Qt.Key_Return, Qt.ShiftModifier)
         h.equal(h.actions(), [], "notices: Shift+Enter presses nothing")
         h.key(Qt.Key_Space)
         h.equal(h.actions(), ["playPause"], "notices: Space is play or pause, as everywhere on this page")
         h.resetCalls()
         // Another notice takes the place of the highlighted one.
-        h.mock.noticeCode = "N_NO_RELATED"
-        h.check(root.shown(h, "text of N_NO_RELATED"), "notices: a new notice replaces the old one")
+        h.mock.noticeCode = "N_STATE_RESET"
+        h.check(root.shown(h, "text of N_STATE_RESET"), "notices: a new notice replaces the old one")
         h.equal(root.pressed(h), [], "notices: and its button is not highlighted before it was read")
         h.key(Qt.Key_Return)
         h.equal([root.highlighted(h), h.actions()], [["Recent one"], []],
           "notices: so Enter dismisses nothing and shows the highlight on a row again")
         h.key(Qt.Key_Up)
-        h.key(Qt.Key_Up)
-        h.equal(root.pressed(h), ["Dismiss"], "notices: Up twice reaches its button")
+        h.equal(root.pressed(h), ["Dismiss"], "notices: Up reaches its button")
         h.key(Qt.Key_Return)
         h.equal(h.actions(), ["dismissNotice"], "notices: Enter presses the highlighted button")
         h.resetCalls()
         h.mock.noticeCode = ""
       },
       function() {
-        h.equal(h.findAll(root.body, root.isNotice).length, 1, "notices: the dismissed one is gone")
+        h.equal(h.findAll(root.body, root.isNotice).length, 1, "notices: the dismissed one makes room")
+        h.check(root.shown(h, "text of N_OUTPUT_FALLBACK") && root.button(h, "Choose output") !== null,
+          "notices: for the one that waited, with its button")
         h.equal([root.highlighted(h), root.pressed(h)], [[], []],
-          "notices: and the highlight did not slide onto the button that is left")
+          "notices: and the highlight did not slide onto that button")
         h.key(Qt.Key_Return)
         h.equal([root.highlighted(h), root.pressed(h), h.actions()], [["Recent one"], [], []],
           "notices: the next Enter only shows the highlight again, on a row")

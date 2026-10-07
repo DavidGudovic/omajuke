@@ -237,6 +237,8 @@ Item {
   // its opening and its closing, and this counts.
   property int _panels: 0
   property int _watchers: 0
+  // One of the two counts went up in this turn (_arrived).
+  property bool _arriving: false
   property bool _stateNoticeRead: false
   property bool _tidyPending: false
   // An output was asked for from outside the panel. It stays true: whoever
@@ -640,6 +642,7 @@ Item {
   // ---- Panels ----
 
   function _count(panels, watchers) {
+    if (panels > root._panels || watchers > root._watchers) root._arrived()
     root._panels = Math.max(0, panels)
     root._watchers = Math.max(0, watchers)
     root._watchPosition()
@@ -651,6 +654,19 @@ Item {
     player.setPositionWatch(root._watchers > 0 || sponsor.watching)
   }
 
+  // A panel that opens reports itself, and its page asks for the position
+  // and for its pictures, before the host counts that panel as open: the
+  // host is the last to learn of it. Asked in that moment it answers that
+  // none is open, and the panel that is opening would be written off: no
+  // picture fetched and the position not followed for as long as it stays
+  // open. So the host is not asked for the rest of a turn in which a count
+  // went up.
+  function _arrived() {
+    if (root._arriving) return
+    root._arriving = true
+    root._later(function() { root._arriving = false })
+  }
+
   // Whether a panel is open, after asking the host. The counts rest on
   // every panel reporting its closing. When the host says that none is
   // open, a report was missed and both counts start over: one lost call
@@ -659,7 +675,7 @@ Item {
   function _panelsOpen() {
     if (root._panels === 0 && root._watchers === 0) return false
     var facade = root.shell
-    var canAsk = facade && typeof facade.isPluginOpen === "function"
+    var canAsk = facade && typeof facade.isPluginOpen === "function" && !root._arriving
     if (canAsk && facade.isPluginOpen(root.pluginId) !== true) root._count(0, 0)
     return root._panels > 0
   }

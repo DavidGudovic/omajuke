@@ -219,7 +219,9 @@ Item {
       visible: root.rows.length > 0
       text: Ui.TEXT.QUEUE_CLEAR
       bordered: true
-      foreground: root.fg
+      // Lettered in the accent colour under the cursor, like every framed
+      // button of the panel.
+      foreground: root.cursorOnClear ? Color.accent : root.fg
       fontFamily: root.fontFamily
       hasCursor: root.cursorOnClear
       onHasCursorChanged: if (hasCursor && root.body) root.body.ensureVisible(clearRow)

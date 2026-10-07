@@ -64,6 +64,10 @@ Panel {
       opened: root.opened
       // The window stays mapped while the card fades out.
       showing: root.opened || panel.visible
+      // What the card can give its content at most: its cap, or less on a
+      // small screen, without its own padding and border.
+      heightLimit: panel.fittedContentHeight(Style.space(640), Style.space(640))
+        - panel.verticalContentInset
       onCloseRequested: root.close()
       onSwitchRequested: function(direction) { root.switchPanel(direction) }
     }

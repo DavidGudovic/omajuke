@@ -103,10 +103,10 @@ test("exports exactly the documented names", function() {
     "VERSION", "accountOffer",
     "barIcon", "captureStep", "clampIndex", "dropLast", "duration", "feedRows", "gateCode", "indexOfKey",
     "keyAction",
-    "listArea", "moveCursor", "outputChoice", "outputRows", "pageTitle", "parentPage", "placeKind",
-    "printable",
-    "recentSkip", "rows", "shortcutRows", "signInButtons", "signInScreen", "stepChoice", "stepControl",
-    "stripLine", "thumbPath", "videoButton"
+    "listArea", "listHeight", "moveCursor", "outputChoice", "outputRows", "pageTitle", "parentPage",
+    "placeKind", "printable",
+    "recentSkip", "rowTitle", "rows", "shortcutRows", "signInButtons", "signInScreen", "stepChoice",
+    "stepControl", "stripLine", "thumbPath", "topNotice", "videoButton"
   ])
 })
 

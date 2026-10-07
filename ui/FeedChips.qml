@@ -38,7 +38,9 @@ Flow {
       bordered: true
       selected: chip.modelData.value === root.current
       hasCursor: root.cursorIndex === chip.index
-      foreground: root.fg
+      // Lettered in the accent colour under the cursor, like every framed
+      // button of the panel.
+      foreground: chip.hasCursor ? Color.accent : root.fg
       fontFamily: root.fontFamily
       fontSize: Style.font.bodySmall
       onClicked: root.picked(chip.modelData.value)

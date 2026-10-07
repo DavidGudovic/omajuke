@@ -2,6 +2,21 @@
 
 Every released version of OmaJuke, newest first. Only changes a user can see are listed.
 
+## 0.2.1 - 2026-10-07
+
+Fixes found by looking at the panel on a real screen.
+
+Fixed:
+
+- The now-playing controls were cut off when two notices showed at once. Only one notice shows at
+  a time now, and the list gives up height instead.
+- No notice any more when autoplay finds no related tracks; it simply stops.
+- The keyboard highlight is now visible on the settings button and on the buttons of a notice.
+- Opening the panel while a track was loaded could leave the list without thumbnails.
+- A failed or stopped track showed the previous track's position.
+- An empty block appeared under "Searching…" on a first search.
+- A track queued from a link shows the link until its title is known, instead of a blank title.
+
 ## 0.2.0 - 2026-10-07
 
 A queue, a video window, shortcuts, a choice of audio output and two things that stay off until

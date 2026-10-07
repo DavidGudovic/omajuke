@@ -35,7 +35,6 @@ var TEXTS = [
   ["N_PROXY", "A proxy is set for this session. OmaJuke does not use it: its connections go direct. "
     + "Use a system-wide VPN to route them"],
   ["N_STATE_RESET", "Saved history could not be read and was reset"],
-  ["N_NO_RELATED", "No related tracks found"],
   ["N_SKIPPED", "Skipped a track that could not be played"],
   ["E_VIDEO_NONE", "No video for this track"],
   ["E_HYPR_VERSION", "This Hyprland version is not tested with OmaJuke"],
@@ -63,7 +62,7 @@ var SKIP = [
 var STOP = [
   "E_NETWORK", "E_STREAM", "E_TIMEOUT", "E_YT_BLOCKED", "E_YTDLP_MISSING", "E_TOOLS_MISSING", "E_MPV_MISSING",
   "E_MPV_START", "E_MPV_EXITED", "E_RUNTIME_DIR", "E_INVALID_INPUT", "E_LINK", "N_PROXY", "N_STATE_RESET",
-  "N_NO_RELATED", "N_SKIPPED", "E_VIDEO_NONE", "E_HYPR_VERSION", "E_HYPR_ERRORS", "E_HYPR_EVAL",
+  "N_SKIPPED", "E_VIDEO_NONE", "E_HYPR_VERSION", "E_HYPR_ERRORS", "E_HYPR_EVAL",
   "E_HYPR_NONE", "N_OUTPUT_FALLBACK", "E_SIGNIN_BROWSER", "E_SIGNIN_CANCELLED", "E_SIGNIN_NONE",
   "E_SIGNED_OUT", "E_SIGNOUT_LEFT", "E_FEED"
 ]

@@ -8,6 +8,9 @@ import qs.Ui
 // and the main page for notices the user dismisses. The message is never
 // cut: it wraps as far as it needs. The buttons take no keyboard focus of
 // their own: the panel moves its one cursor onto them and says so here.
+// The button that has it is lettered in the accent colour, as the chosen
+// button of the kit's confirmation is: a framed button changes too little
+// under the cursor to be found by its fill alone.
 BorderSurface {
   id: root
 
@@ -55,7 +58,7 @@ BorderSurface {
         visible: root.primaryLabel !== ""
         text: root.primaryLabel
         bordered: true
-        foreground: root.fg
+        foreground: root.cursor === "primary" ? Color.accent : root.fg
         fontFamily: root.fontFamily
         fontSize: Style.font.bodySmall
         hasCursor: root.cursor === "primary"
@@ -66,7 +69,7 @@ BorderSurface {
         visible: root.secondaryLabel !== ""
         text: root.secondaryLabel
         bordered: true
-        foreground: root.fg
+        foreground: root.cursor === "secondary" ? Color.accent : root.fg
         fontFamily: root.fontFamily
         fontSize: Style.font.bodySmall
         hasCursor: root.cursor === "secondary"

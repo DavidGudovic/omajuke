@@ -4,7 +4,9 @@ OmaJuke plays YouTube from the Omarchy bar. Click its icon, type a search, press
 result: the audio plays through mpv and keeps playing after the panel is closed. No browser is
 opened and no account is needed.
 
-This is version 0.2.0. What it does:
+![The OmaJuke panel under its bar icon: search results, the playing track and the video window](preview.png)
+
+This is version 0.2.1. What it does:
 
 - Searches YouTube and lists up to 20 results with thumbnails.
 - Plays a result, or a YouTube video link pasted into the search field.
@@ -57,8 +59,9 @@ The following have not been tried by a person:
   **Change…** has not been tried on a real desktop.
 - Losing the chosen audio output has been tested with made-up device lists, not by unplugging a
   device.
-- The pages added in this version (queue, shortcuts, audio outputs, account) are covered by the
-  automated tests but have not been looked at on a real screen.
+- The main page, the settings page and the signed-out account page have been looked at on a real
+  screen. The queue, shortcuts and audio output pages are covered by the automated tests and
+  were rendered off-screen, but have not been looked at on a real screen.
 
 ## Requirements
 
@@ -129,7 +132,8 @@ The search field has the keyboard as soon as the panel opens.
   that starts with `/`. Put a word in front and it is a search again.
 - **Queue and recently played.** With an empty field the list shows what is queued after the
   playing track, and under it what you played recently. Emptying the field also drops the search
-  results.
+  results. A link that was added to the queue is listed as `youtu.be/...` until its turn comes: a
+  video is looked up only when it is about to play.
 - **Click a row** to play it. Playing a result or a recent track starts a new queue with that
   track alone. Clicking a queued track jumps to it and keeps the queue. Moving the pointer over
   the rows moves the highlight.
@@ -139,8 +143,11 @@ The search field has the keyboard as soon as the panel opens.
 - **A playlist** opened from one of your account's lists shows its title above its videos. The
   marked chip leads back to the playlists.
 
-Notices appear above the list: that a track was skipped, that no related tracks were found, that
-the chosen audio output is gone. Each has a button to dismiss or answer it.
+Notices appear above the list, one at a time: that a video needs your account, that a track was
+skipped, that the chosen audio output is gone, and the question about sponsor skipping. Each has
+a button to dismiss or answer it, and the next one shows once it is gone. The list gives up rows
+to make room for a notice, so the controls under the playing track always stay in view. When
+autoplay finds no related tracks, nothing is said: the queue ends with the track that plays.
 
 Live streams are marked `LIVE`, and you cannot seek in them. Playing them has had little testing.
 
@@ -165,8 +172,10 @@ acts on it. A panel that is reopened on earlier results highlights nothing by it
 Every button of the page can be reached with the arrow keys, so no page needs a pointer:
 
 - Up from the first row leads, one press at a time, to the row of list chips (while you are
-  signed in), to the buttons of the notices, and to the gear button at the top. Enter presses
-  the highlighted one. On the chips, Left and Right pick a chip.
+  signed in), to the buttons of the notice, and to the gear button at the top. Enter presses
+  the highlighted one. On the chips, Left and Right pick a chip. A highlighted icon button is
+  framed like a highlighted row, and a highlighted button with a label is lettered in the accent
+  colour.
 - One more Up from the gear button leads round to the bottom of the panel, to the buttons under
   the playing track: Previous, Play or Pause, Next, mute, video, audio output and queue. The
   highlight starts on Play or Pause. Left and Right pick a button and step over one that cannot
@@ -426,7 +435,7 @@ The answers:
 `status` answers one JSON object:
 
 ```json
-{ "version": "0.2.0", "state": "playing", "id": "AAAAAAAAAAA", "title": "Example title",
+{ "version": "0.2.1", "state": "playing", "id": "AAAAAAAAAAA", "title": "Example title",
   "channel": "Example channel", "position": 37.2, "duration": 213, "live": false, "volume": 70,
   "muted": false, "queueLength": 3, "queueIndex": 0, "video": "hidden", "output": "",
   "signedIn": false, "updatePending": false, "error": "" }
