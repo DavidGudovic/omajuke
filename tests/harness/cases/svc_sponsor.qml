@@ -168,8 +168,18 @@ QtObject {
   function skips() {
     var h = root.h
     var s = h.service
-    h.equal([s.panelOpen, h.parts.sponsor.watching], [false, true],
-      "skip: a segment lies ahead, no panel open")
+    // The step before saw the lookup go out; its answer may still be on
+    // its way.
+    root.until("skip: the answer is in", function() { return h.parts.sponsor.watching }, 5000, function() {
+      h.equal([s.panelOpen, h.parts.sponsor.watching], [false, true],
+        "skip: a segment lies ahead, no panel open")
+      root.skipped()
+    })
+  }
+
+  function skipped() {
+    var h = root.h
+    var s = h.service
     root.until("skip: the segment is jumped over", function() { return s.lastSkip !== null }, 8000,
       function() {
         h.equal([s.lastSkip.category, s.lastSkip.to], ["sponsor", 60], "skip: to the end of the segment")

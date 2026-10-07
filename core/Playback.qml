@@ -36,7 +36,8 @@ Item {
   property var settings: null
   // Where related tracks come from: an object with mix(id, done), which
   // answers done({ ok, code, tracks }) once, with tracks a list of track
-  // rows. Null switches autoplay off.
+  // rows, and may have cancelMix(), which gives a question up. Null
+  // switches autoplay off.
   property var mixer: null
   // True while the user wants history kept on disk.
   property bool persistHistory: false
@@ -661,8 +662,16 @@ Item {
   }
 
   // A stop withdraws the question: its answer is not wanted any more, and
-  // the item may be asked for again when it is played again.
+  // the item may be asked for again when it is played again. A question
+  // still on its way is given up, so nothing more is fetched for it.
   function _dropMix() {
+    if (root._mixPending && root.mixer !== null && typeof root.mixer.cancelMix === "function") {
+      try {
+        root.mixer.cancelMix()
+      } catch (error) {
+        // Nothing depends on it: the answer is ignored either way.
+      }
+    }
     root._mixRequest += 1
     root._mixPending = false
     root._mixResume = false

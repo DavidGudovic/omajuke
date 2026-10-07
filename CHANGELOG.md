@@ -17,6 +17,8 @@ Added:
 
 Changed:
 
+- Stopping playback gives up a lookup of related tracks that is still running, so nothing more is
+  fetched for a track that no longer plays.
 - Picking a new video corner or size in the settings moves a video window that is open, and
   forgets the places the window was left in, so the new choice counts on every monitor.
 - While signed in, the list chips stay on one line and scroll sideways where the panel is too

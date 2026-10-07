@@ -259,8 +259,6 @@ Item {
     var keys = root._keys()
     keys[action] = combo
     if (dirty) keys.dirty = true
-    // Whoever chose a shortcut has no need of the first-use question.
-    if (dirty && combo !== "") keys.asked = true
     return root.store !== null && root.store.patch({ shortcuts: keys }) === true
   }
 

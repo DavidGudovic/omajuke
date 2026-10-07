@@ -106,7 +106,9 @@ QtObject {
         .map(function(entry) { return entry.argv[2] }), KeyCombo.LAYOUT_OPTIONS,
         "opened: the four options that say which letter a key number types")
       h.equal(parts.keys.rows.map(function(row) { return [row.status, row.proposal] }),
-        [["unassigned", root.j2], ["unassigned", root.v1], ["unassigned", root.o1]],
+        [["unassigned", root.j2], ["unassigned", root.v1], ["unassigned", root.o1],
+          ["unassigned", "SUPER + CTRL + ALT + K"], ["unassigned", "SUPER + CTRL + ALT + N"],
+          ["unassigned", "SUPER + CTRL + ALT + B"]],
         "opened: each action is offered its first combination that is free")
       h.equal(parts.store.patches.length, 0, "opened: nothing is saved by looking")
       root.next()

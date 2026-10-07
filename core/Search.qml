@@ -153,6 +153,12 @@ Item {
     })
   }
 
+  // Gives up the question for related tracks that is on its way, if any.
+  // Its callback hears "cancelled".
+  function cancelMix() {
+    root._cancelMix()
+  }
+
   // Our paths, or null until the file layer has vouched for the private
   // directories: yt-dlp keeps its cache in one of them.
   function _paths() {

@@ -232,7 +232,12 @@ QtObject {
     h.equal(s._ipcVideo("toggle"), "ok", "ipc: toggle shows")
     root.until("ipc: shown", root.videoIs("shown"), 8000, function() {
       h.equal(s._ipcVideo("toggle"), "ok", "ipc: toggle hides")
-      root.until("ipc: hidden", root.videoIs("hidden"), 5000, function() {
+      // Hidden at once; the window is let go once its place is read, and
+      // only then can it be asked for again.
+      root.until("ipc: hidden", function() {
+        var last = root.sent("force-window").slice(-1)[0]
+        return s.videoState === "hidden" && last !== undefined && last[2] === "no"
+      }, 5000, function() {
         h.equal(s._ipcVideo("hide"), "unhandled", "ipc: nothing left to hide")
         root.next()
       })
