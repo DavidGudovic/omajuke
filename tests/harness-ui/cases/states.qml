@@ -3,8 +3,9 @@ import QtQuick
 // Every empty, loading and error state of the panel. The blocking ones show
 // exactly one notice and no page. On the main page each state of the list
 // area has its line, and every error sentence is what the service's
-// errorText answered, never wording of the view's own. Also the notices the
-// user dismisses and the now-playing strip with its controls.
+// errorText answered, never wording of the view's own. Also the proxy
+// question, which the keyboard answers as well as the pointer, the notices
+// the user dismisses and the now-playing strip with its controls.
 QtObject {
   id: root
 
@@ -107,12 +108,41 @@ QtObject {
         h.equal(h.findAll(root.body, root.isNotice).length, 1, "proxy: exactly one notice")
         h.check(h.find(root.body, root.isPage) === null, "proxy: no page is loaded")
         h.resetCalls()
-        // Keys do not answer the proxy question: only its button does.
-        h.key(Qt.Key_Return)
+        // The question is answered from the keyboard in two steps, so that
+        // one stray key press never answers it.
+        var answer = root.button(h, "Continue without a proxy")
+        h.equal(answer.hasCursor, false, "proxy: the button is not highlighted when the notice appears")
         h.key(Qt.Key_Space)
-        h.equal(h.actions(), [], "proxy: Enter and Space acknowledge nothing")
-        h.click(root.button(h, "Continue without a proxy"))
-        h.equal(h.actions(), ["acknowledgeProxy"], "proxy: the button acknowledges, once")
+        h.key(Qt.Key_A)
+        h.equal([answer.hasCursor, h.actions()], [false, []], "proxy: Space and letters do nothing")
+        h.key(Qt.Key_Return)
+        h.equal(answer.hasCursor, true, "proxy: the first Enter shows the highlight on the button")
+        h.equal(h.actions(), [], "proxy: and acknowledges nothing yet")
+        h.key(Qt.Key_Return, Qt.ShiftModifier)
+        h.key(Qt.Key_Space)
+        h.key(Qt.Key_Up)
+        h.key(Qt.Key_Down)
+        h.equal([answer.hasCursor, h.actions()], [true, []],
+          "proxy: the highlight stays on the only button, and only a plain Enter presses it")
+        h.key(Qt.Key_Return)
+        h.equal(h.actions(), ["acknowledgeProxy"], "proxy: Enter on the highlighted button answers, once")
+        h.resetCalls()
+        h.click(answer)
+        h.equal(h.actions(), ["acknowledgeProxy"], "proxy: a click on the button acknowledges as well")
+        // A panel that is closed and opened again starts without a highlight.
+        h.close(root.body)
+        h.hide(root.body)
+        h.open(root.body)
+      },
+      function() {
+        var answer = root.button(h, "Continue without a proxy")
+        h.equal(answer.hasCursor, false, "proxy: a reopened panel shows the question without a highlight")
+        h.resetCalls()
+        h.key(Qt.Key_Down)
+        h.equal(answer.hasCursor, true, "proxy: Down shows the highlight as well")
+        h.key(Qt.Key_Escape)
+        h.equal(h.actions(), [], "proxy: Esc answers nothing")
+        h.equal(root.closes, ["close", "close"], "proxy: it asks to close the panel")
         h.mock.networkHold = false
       },
       function() {

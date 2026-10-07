@@ -11,9 +11,15 @@ import "../lib/Sh.js" as Sh
 // with a command line from lib/Sh.js.
 //
 // It owns two rules. Nothing is touched before prepare() has vouched for
-// the directories (ours, mode 700, not links). And no path is written or
-// removed unless Paths.owns() says it has exactly the shape of a file the
-// plugin creates; anything else is answered with "refused" and no job.
+// the directories (ours, mode 700, not links). And no path is written, read
+// or removed unless Paths.kind() says it has exactly the shape of a file
+// the plugin creates and is of a kind that operation is meant for; anything
+// else is answered with "refused" and no job.
+//
+// The saved login (a cookie file) is held tighter than the rest. Nothing
+// here can read it or write text to it: it comes to exist through
+// exportCookies() alone, is handed to a tool only as a throwaway copy made
+// by copyJar(), and can otherwise only be removed.
 Item {
   id: root
 
@@ -41,16 +47,22 @@ Item {
   // will work), and a state file of ours is there to be loaded.
   readonly property bool mprisAvailable: _mprisAvailable
   readonly property bool stateFilePresent: _stateFilePresent
+  // What the last prepareData() found: a saved login of ours is there. This
+  // is the only way the plugin learns it; the file is never opened to ask.
+  readonly property bool jarPresent: _jarPresent
 
   // What a file job may print: PRIVATE_WRITE prints nothing, the
   // preparation a handful of short tokens.
   readonly property int _writeReplyBytes: 64
   readonly property int _prepareReplyBytes: 256
+  // The browser families a sign-in profile can be made for.
+  readonly property var _families: ["chromium", "firefox"]
 
   property string _status: "pending"
   property string _failCode: ""
   property bool _mprisAvailable: false
   property bool _stateFilePresent: false
+  property bool _jarPresent: false
   property bool _preparing: false
   // True once a preparation has vouched for the private directories. They
   // then exist and are ours even if a tool is missing; the clean-up at
@@ -117,7 +129,7 @@ Item {
   // exact only if the file is ASCII (the runner decodes chunk by chunk).
   function read(path, maxBytes, done) {
     var sized = typeof maxBytes === "number" && Math.floor(maxBytes) === maxBytes && maxBytes >= 1
-    if (!root._usable() || !sized || !Paths.owns(root.paths, path)) {
+    if (!root._usable() || !sized || !root._readable(path)) {
       root._refuse(done)
       return
     }
@@ -131,11 +143,12 @@ Item {
     })
   }
 
-  // Removes files of ours. One path that is not ours refuses the whole
-  // list. A file that is already gone is not an error.
+  // Removes files of ours, the saved login and its copies among them. One
+  // path that is not a file of ours refuses the whole list. A file that is
+  // already gone is not an error.
   function remove(list, done) {
     var ours = root._usable() && Array.isArray(list)
-    for (var i = 0; ours && i < list.length; i++) ours = Paths.owns(root.paths, list[i])
+    for (var i = 0; ours && i < list.length; i++) ours = root._removable(list[i])
     if (!ours) {
       root._refuse(done)
       return
@@ -173,14 +186,134 @@ Item {
     })
   }
 
+  // Removes the directory of one sign-in attempt with everything in it: the
+  // browser profile and whatever an export left. A directory that is already
+  // gone is not an error. Nothing else is ever removed as a tree.
+  function removeTree(dir, done) {
+    if (!root._usable() || Paths.kind(root.paths, dir) !== "signinAttempt") {
+      root._refuse(done)
+      return
+    }
+    root.runner.run({
+      tag: "remove-tree",
+      argv: Sh.removeTreeArgv(root.tools, dir),
+      timeoutSec: Const.TIMEOUTS.local,
+      maxBytes: root._writeReplyBytes,
+      env: Env.local(),
+      done: root._callback(done)
+    })
+  }
+
+  // ---- The saved login ----
+
+  // Checks and creates the data directory, removes what an interrupted
+  // export left in it, and finds out whether a saved login is there
+  // (jarPresent, set before done is called). done(result) gets the runner's
+  // result; it is not ok when the directory cannot be trusted.
+  function prepareData(done) {
+    if (!root._usable()) {
+      root._refuse(done)
+      return
+    }
+    root.runner.run({
+      tag: "prepare-data",
+      argv: Sh.prepareDataArgv(root.tools, root.paths),
+      timeoutSec: Const.TIMEOUTS.local,
+      maxBytes: root._prepareReplyBytes,
+      env: Env.local(),
+      done: function(result) {
+        var tokens = result.ok ? result.stdout.split("\n") : []
+        root._jarPresent = tokens.indexOf("ok") !== -1 && tokens.indexOf("jar") !== -1
+        root._callback(done)(result)
+      }
+    })
+  }
+
+  // Makes the directory of sign-in attempt n (a counter) with an empty
+  // browser profile and an empty configuration directory in it. family is
+  // "chromium" or "firefox"; for firefox, userJs is the text of the
+  // profile's preferences file. Fails when the directory already exists: an
+  // attempt never starts on a profile that was there before it.
+  function makeSigninDirs(n, family, userJs, done) {
+    var dir = Paths.signinAttemptDir(root.paths, n)
+    var firefox = family === "firefox"
+    var known = root._families.indexOf(family) !== -1
+    var text = !firefox || (typeof userJs === "string" && userJs !== "")
+    if (!root._usable() || dir === "" || !known || !text) {
+      root._refuse(done)
+      return
+    }
+    var spec = {
+      tag: "signin-dirs",
+      argv: Sh.signinDirsArgv(root.tools, dir, family),
+      timeoutSec: Const.TIMEOUTS.local,
+      maxBytes: root._writeReplyBytes,
+      env: Env.local(),
+      done: root._callback(done)
+    }
+    if (firefox) spec.stdin = userJs
+    root.runner.run(spec)
+  }
+
+  // Turns the cookies of sign-in attempt n's browser profile into the saved
+  // login. browserName is yt-dlp's name for the browser, one of
+  // Sh.COOKIE_BROWSERS. result.stdout is one word: "ok", "not-signed-in" or
+  // "error". Returns the job's id for runner.cancel(), or 0 when nothing was
+  // started.
+  //
+  // The export removes the attempt directory when it ends by itself, but
+  // not when it is killed: the caller calls removeTree() in done whatever
+  // the result, and only then moves on.
+  function exportCookies(browserName, n, done) {
+    var dir = Paths.signinAttemptDir(root.paths, n)
+    if (!root._usable() || dir === "" || Sh.COOKIE_BROWSERS.indexOf(browserName) === -1) {
+      root._refuse(done)
+      return 0
+    }
+    return root.runner.run({
+      tag: "cookie-export",
+      argv: Sh.cookieExportArgv(root.tools, browserName, dir, root.paths.jarFile),
+      timeoutSec: Const.TIMEOUTS.cookieExport,
+      maxBytes: root._writeReplyBytes,
+      env: Env.local(),
+      umask077: true,
+      done: root._callback(done)
+    })
+  }
+
+  // Copies the saved login to the throwaway file of counter n, for one
+  // yt-dlp run: yt-dlp rewrites the cookie file it is given, so it never
+  // gets the saved one. The caller removes the copy in that run's done.
+  function copyJar(n, done) {
+    var copy = Paths.jarCopyFile(root.paths, n)
+    if (!root._usable() || copy === "") {
+      root._refuse(done)
+      return
+    }
+    root.runner.run({
+      tag: "jar-copy",
+      argv: Sh.copyArgv(root.tools, root.paths.jarFile, copy),
+      timeoutSec: Const.TIMEOUTS.local,
+      maxBytes: root._writeReplyBytes,
+      env: Env.local(),
+      umask077: true,
+      done: root._callback(done)
+    })
+  }
+
+  // ---- Destruction ----
+
   // Removes everything under the runtime directory, for the service's
   // destruction. Detached, because the runner dies with the service, and
   // bounded by timeout alone. Does nothing unless a preparation has vouched
   // for the directory: an unchecked one may be a link to somewhere else.
-  function cleanupDetached() {
+  // withJar true removes the saved login as well, for when the plugin is
+  // being switched off or removed and not merely restarted.
+  function cleanupDetached(withJar) {
     if (!root._dirsVerified) return
     Quickshell.execDetached({
-      command: Sh.cleanupArgv(root.tools, root.paths),
+      command: withJar === true ? Sh.cleanupWithJarArgv(root.tools, root.paths)
+        : Sh.cleanupArgv(root.tools, root.paths),
       clearEnvironment: true,
       environment: Env.local()
     })
@@ -193,9 +326,21 @@ Item {
   // The state file or an info file: the two things written through here.
   // (Thumbnails are ours too, but curl writes them.)
   function _writable(path) {
-    if (!Paths.owns(root.paths, path)) return false
-    var infoPrefix = root.paths.infoDir + "/"
-    return path === root.paths.stateFile || path.slice(0, infoPrefix.length) === infoPrefix
+    var kind = Paths.kind(root.paths, path)
+    return kind === "state" || kind === "info"
+  }
+
+  // What may be read back: never the saved login or a copy of it.
+  function _readable(path) {
+    var kind = Paths.kind(root.paths, path)
+    return kind === "state" || kind === "info" || kind === "thumb"
+  }
+
+  // Every file of ours. A sign-in attempt is a directory and goes through
+  // removeTree() instead.
+  function _removable(path) {
+    var kind = Paths.kind(root.paths, path)
+    return kind !== "" && kind !== "signinAttempt"
   }
 
   // A result in the runner's shape for a request that started no job.

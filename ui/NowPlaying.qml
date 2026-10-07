@@ -5,14 +5,20 @@ import "Ui.js" as Ui
 
 // The strip at the bottom of the main page for the current track: what is
 // playing, where it is, and the controls for it (seek, previous, play or
-// pause, next, mute, volume). It shows the service's playback state and
-// calls the service; it keeps no state of its own.
+// pause, next, mute, volume, the video window, and the ways to the outputs
+// and the queue). It shows the service's playback state and calls the
+// service; it keeps no state of its own. Its buttons take no keyboard
+// focus: the panel moves its one cursor onto the strip and says here which
+// button carries it.
 Column {
   id: root
 
   property var service: null
   // The PanelBody this strip sits in: theme values and the bar.
   property var body: null
+  // Which button carries the panel's cursor, counted through Ui.CONTROLS,
+  // -1 for none.
+  property int cursorIndex: -1
 
   readonly property color fg: body ? body.fg : Color.foreground
   readonly property string fontFamily: body ? body.fontFamily : Style.font.family
@@ -35,16 +41,69 @@ Column {
   readonly property bool seekable: service ? service.seekable === true : false
   readonly property int volume: service ? service.volume : 0
   readonly property bool muted: service ? service.muted === true : false
-  // Whether the queue holds a track after this one.
+  // Whether the queue holds a track after this one, and one before it.
   readonly property bool hasNext: service
     ? service.queueIndex >= 0 && service.queueIndex < service.queue.length - 1 : false
-  // The second line: why nothing is heard yet, or else who made the track.
-  readonly property string detail: failed && service ? String(service.errorText(service.errorCode) || "")
-    : (starting ? Ui.TEXT.LOADING : channel)
+  readonly property bool hasPrevious: service ? service.queueIndex > 0 : false
+  // The video window: "hidden", "loading", "shown", or "unavailable" when
+  // the track has no picture to show.
+  readonly property string videoState: service ? String(service.videoState || "") : ""
+  // Why there is no picture, in the service's words: the track has none,
+  // or the window could not be asked for. The second comes with a window
+  // that stays "hidden", and is said all the same.
+  readonly property string videoNote: service ? String(service.videoNote || "") : ""
+  readonly property string videoNoteText: service && videoNote !== ""
+    ? String(service.errorText(videoNote) || "") : ""
+  readonly property var videoLook: Ui.videoButton(videoState, videoNoteText !== "")
+  readonly property string videoTip: videoLook.tip === "hide" ? Ui.TEXT.VIDEO_HIDE
+    : (videoLook.tip === "loading" ? Ui.TEXT.VIDEO_LOADING
+      : (videoLook.tip === "note" && videoNoteText !== "" ? videoNoteText : Ui.TEXT.VIDEO_SHOW))
+  // The chosen audio output is gone and the system default plays instead.
+  readonly property bool outputLost: service ? String(service.outputNote || "") !== "" : false
+  // The second line: why nothing is heard or seen yet, that a sponsor
+  // segment was just skipped, or else who made the track.
+  // A sponsor segment was skipped a moment ago.
+  readonly property bool skipped: Ui.recentSkip(service ? service.lastSkip : null, position)
+  readonly property string line: Ui.stripLine(playbackState, videoState, skipped, videoNoteText !== "")
+  readonly property string detail: {
+    if (root.line === "error") {
+      return root.service ? String(root.service.errorText(root.service.errorCode) || "") : ""
+    }
+    if (root.line === "loading") return Ui.TEXT.LOADING
+    if (root.line === "video") return Ui.TEXT.VIDEO_LOADING
+    if (root.line === "novideo" && root.videoNoteText !== "") return root.videoNoteText
+    if (root.line === "skip") return Ui.TEXT.SKIPPED
+    return root.channel
+  }
+
+  // Which of the buttons can be pressed now, in the order of Ui.CONTROLS.
+  readonly property var usable: [seekable || hasPrevious, true, hasNext, true, true, true, true]
 
   // Sub-pages opened from the strip (the queue, the outputs) are asked for
   // through this signal, as on every page.
   signal navigate(string page)
+
+  // Presses a button by its name in Ui.CONTROLS, for a click on it and for
+  // Enter while it carries the cursor alike. A button that cannot be
+  // pressed now does nothing.
+  function press(name) {
+    var at = Ui.CONTROLS.indexOf(name)
+    if (at === -1 || root.usable[at] !== true) return
+    if (name === "outputs" || name === "queue") {
+      root.navigate(name)
+      return
+    }
+    if (!root.service) return
+    if (name === "previous") root.service.previous()
+    else if (name === "playPause") root.service.playPause()
+    else if (name === "next") root.service.next()
+    else if (name === "mute") root.service.toggleMute()
+    else if (name === "video") root.service.toggleVideo()
+  }
+
+  function _carries(name) {
+    return root.cursorIndex === Ui.CONTROLS.indexOf(name)
+  }
 
   // Only tracks the strip really shows are fetched.
   function requestThumb() {
@@ -181,9 +240,11 @@ Column {
         tooltipText: Ui.TEXT.PREVIOUS
         foreground: root.fg
         fontFamily: root.fontFamily
-        enabled: root.seekable
+        // Back to the start of this track, or to the track before it.
+        enabled: root.seekable || root.hasPrevious
         opacity: enabled ? 1 : 0.4
-        onClicked: if (root.service) root.service.previous()
+        hasCursor: root._carries("previous")
+        onClicked: root.press("previous")
       }
 
       Button {
@@ -196,7 +257,8 @@ Column {
         foreground: root.fg
         fontFamily: root.fontFamily
         horizontalPadding: Style.spacing.panelGap
-        onClicked: if (root.service) root.service.playPause()
+        hasCursor: root._carries("playPause")
+        onClicked: root.press("playPause")
       }
 
       Button {
@@ -207,7 +269,8 @@ Column {
         fontFamily: root.fontFamily
         enabled: root.hasNext
         opacity: enabled ? 1 : 0.4
-        onClicked: if (root.service) root.service.next()
+        hasCursor: root._carries("next")
+        onClicked: root.press("next")
       }
     }
 
@@ -222,7 +285,8 @@ Column {
         tooltipText: root.muted ? Ui.TEXT.UNMUTE : Ui.TEXT.MUTE
         foreground: root.fg
         fontFamily: root.fontFamily
-        onClicked: if (root.service) root.service.toggleMute()
+        hasCursor: root._carries("mute")
+        onClicked: root.press("mute")
       }
 
       PanelSlider {
@@ -236,6 +300,40 @@ Column {
         value: root.volume
         opacity: root.muted ? 0.5 : 1
         onMoved: function(value) { if (root.service) root.service.setVolume(Math.round(value)) }
+      }
+
+      // Lit while the video window is open. A click asks for the window or
+      // takes the wish back, whatever state it is in.
+      PanelActionButton {
+        anchors.verticalCenter: parent.verticalCenter
+        iconText: root.videoLook.icon
+        tooltipText: root.videoTip
+        foreground: root.videoLook.lit ? Color.accent : root.fg
+        hoverColor: foreground
+        fontFamily: root.fontFamily
+        hasCursor: root._carries("video")
+        onClicked: root.press("video")
+      }
+
+      PanelActionButton {
+        anchors.verticalCenter: parent.verticalCenter
+        iconText: Ui.GLYPH.speaker
+        tooltipText: Ui.TEXT.OUTPUTS_TITLE
+        foreground: root.outputLost ? root.urgent : root.fg
+        hoverColor: foreground
+        fontFamily: root.fontFamily
+        hasCursor: root._carries("outputs")
+        onClicked: root.press("outputs")
+      }
+
+      PanelActionButton {
+        anchors.verticalCenter: parent.verticalCenter
+        iconText: Ui.GLYPH.queue
+        tooltipText: Ui.TEXT.QUEUE_TITLE
+        foreground: root.fg
+        fontFamily: root.fontFamily
+        hasCursor: root._carries("queue")
+        onClicked: root.press("queue")
       }
     }
   }

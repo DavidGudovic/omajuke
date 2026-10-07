@@ -21,6 +21,14 @@ QtObject {
   readonly property string title: "A,vid=1 \"q\""
   readonly property string filter: "@omajuke-norm:dynaudnorm=f=250:g=31:p=0.9"
 
+  // Related tracks are another case's subject. Here the user has switched
+  // them off, so a queue ends where the user's own tracks end.
+  function setup(h, done) {
+    var entry = { id: h.manifest.id, autoplay: false }
+    h.shell.barConfig = { position: "top", layout: { left: [], center: [], right: [entry] } }
+    done()
+  }
+
   function run(h) {
     root.h = h
     h.scenario({ ytdlp: "ok", mpv: "ok" })
@@ -220,7 +228,8 @@ QtObject {
       var state = root.onDisk()
       h.equal(Object.keys(state), ["version", "volume", "muted", "proxyAck", "prefs", "recents", "queue"],
         "saved: the file has these keys and no others")
-      h.equal([state.version, state.proxyAck, state.prefs], [1, false, {}], "saved: nothing was chosen yet")
+      h.equal([state.version, state.proxyAck, state.prefs], [1, false, { autoplay: false }],
+        "saved: the one choice that was made is kept beside the lists")
       var track = { id: root.idB, title: root.title, channel: "c", duration: 5, live: false }
       h.equal(state.recents.map(function(recent) { return recent.id }), [root.idB, root.idA],
         "saved: the recent tracks, newest first")
@@ -244,7 +253,7 @@ QtObject {
     h.equal([s.settings.evenVolume, root.count(["af", "add", root.filter])], [false, 0], "even: off at first")
     h.check(s.setSetting("evenVolume", true), "even: switching on is taken")
     h.equal(s.settings.evenVolume, true, "even: on at once")
-    h.equal(root.settingsCalls().slice(-1)[0].args, [id, { id: id, evenVolume: true }],
+    h.equal(root.settingsCalls().slice(-1)[0].args, [id, { id: id, autoplay: false, evenVolume: true }],
       "even: the host was handed the whole entry")
     root.until("even: mpv adds the filter", root.wasSent(["af", "add", root.filter]), 5000, function() {
       h.check(s.setSetting("evenVolume", false), "even: switching off is taken")

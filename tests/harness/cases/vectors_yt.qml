@@ -1,21 +1,25 @@
 import QtQuick
 import "../../../lib/Const.js" as Const
+import "../../../lib/FeedUrls.js" as FeedUrls
 import "../../../lib/Thumbs.js" as Thumbs
 import "../../../lib/YtArgs.js" as YtArgs
 import "../../vectors/thumbs.js" as ThumbsVectors
 
 // Runs the vector table of Thumbs in Qt's JavaScript engine, the one the
 // plugin really runs on, and then checks there what a table cannot hold:
-// the yt-dlp command lines item by item, that their shared part cannot be
-// changed, and how the two patterns that read outside text treat every
-// UTF-16 unit.
+// the yt-dlp command lines item by item, with and without the account (the
+// ones lib/YtArgs.js builds and the ones lib/FeedUrls.js builds for the
+// account's lists, the check of a login and the watched report), that
+// their shared part cannot be changed, and how the patterns that read
+// outside text treat every UTF-16 unit.
 QtObject {
   id: root
 
   property string kind: "component"
 
   readonly property var paths: ({ ok: true, ytCacheDir: "/run/user/1000/omajuke/ytcache",
-    thumbsDir: "/run/user/1000/omajuke/thumbs" })
+    thumbsDir: "/run/user/1000/omajuke/thumbs", jarDir: "/run/user/1000/omajuke/jar",
+    jarFile: "/home/user/.local/share/omajuke/cookies.txt" })
   readonly property var tools: ({ ytdlp: "/usr/bin/yt-dlp", curl: "/usr/bin/curl" })
 
   readonly property var common: [
@@ -48,6 +52,54 @@ QtObject {
     h.equal(YtArgs.search(null, root.paths), null, "search: no tools")
   }
 
+  // The calls that use the account: the copy of the login stands where the
+  // signed-out pair stands in the others, and nothing but a numbered copy
+  // in our own folder is taken for one.
+  function checkAccount(h) {
+    var copy = "/run/user/1000/omajuke/jar/7.txt"
+    var head = root.common.slice(0, 12).concat(["--cookies", copy])
+    var list = function(count) {
+      return ["--flat-playlist", "--playlist-items", "1:" + count, "-J", "-a", "-"]
+    }
+    h.equal(YtArgs.mix(root.tools, root.paths), root.common.concat(list(25)), "mix: the constant list")
+    h.equal(FeedUrls.feedArgv(root.tools, root.paths, copy), head.concat(list(50)),
+      "feed: the constant list")
+    h.equal(FeedUrls.verifyArgv(root.tools, root.paths, copy), head.concat(list(1)),
+      "verify: the constant list")
+    h.equal(FeedUrls.markArgv(root.tools, root.paths, copy),
+      head.concat(["--mark-watched", "--simulate", "--quiet", "-a", "-"]), "mark: the constant list")
+    h.equal(YtArgs.resolveWithAccount(root.tools, root.paths, 1080, copy),
+      head.concat(root.resolveList(1080).slice(14)), "resolve with the account, at 1080")
+    h.equal(YtArgs.resolveWithAccount(root.tools, root.paths, "x", copy),
+      head.concat(root.resolveList(720).slice(14)), "resolve with the account: an odd height")
+    var refused = [
+      root.paths.jarFile, root.paths.jarDir, root.paths.jarDir + "/7", root.paths.jarDir + "/7.txt ",
+      root.paths.jarDir + "/x.txt", root.paths.jarDir + "/../jar/7.txt", root.paths.jarDir + "//7.txt",
+      "/run/user/1000/omajuke/thumbs/7.txt", "/etc/passwd", "7.txt", "", "constructor", null, undefined, 7,
+      [copy]
+    ]
+    for (var i = 0; i < refused.length; i++) {
+      h.equal([
+        FeedUrls.feedArgv(root.tools, root.paths, refused[i]),
+        FeedUrls.verifyArgv(root.tools, root.paths, refused[i]),
+        FeedUrls.markArgv(root.tools, root.paths, refused[i]),
+        YtArgs.resolveWithAccount(root.tools, root.paths, 720, refused[i])
+      ], [null, null, null, null], "the account: not a copy of the login (" + i + ")")
+    }
+    h.equal(FeedUrls.feedArgv(root.tools, { ok: true, ytCacheDir: root.paths.ytCacheDir }, copy), null,
+      "feed: paths that do not say where the copies live")
+    h.equal(FeedUrls.feedArgv({ ytdlp: "yt-dlp" }, root.paths, copy), null, "feed: a tool that is not a path")
+    // Every UTF-16 unit in the name of the copy: only the ten digits make
+    // a copy of it.
+    var wrong = 0
+    for (var code = 0; code <= 0xffff; code++) {
+      var named = root.paths.jarDir + "/7" + String.fromCharCode(code) + ".txt"
+      var taken = FeedUrls.markArgv(root.tools, root.paths, named) !== null
+      if (taken !== (code >= 0x30 && code <= 0x39)) wrong++
+    }
+    h.equal(wrong, 0, "the account: the name of a copy is digits and nothing else, for every UTF-16 unit")
+  }
+
   // The module is one instance for everything that imports it, and in this
   // engine a frozen list can still be written to. So no command line may
   // depend on a list another importer can reach.
@@ -63,6 +115,10 @@ QtObject {
       "search: unchanged by a write to SIGNED_OUT")
     h.equal(YtArgs.resolve(root.tools, root.paths, 720), root.resolveList(720),
       "resolve: unchanged by a write to SIGNED_OUT")
+    h.equal(YtArgs.mix(root.tools, root.paths).slice(12, 14), ["--no-cookies", "--no-warnings"],
+      "mix: unchanged by a write to SIGNED_OUT")
+    var feed = FeedUrls.feedArgv(root.tools, root.paths, "/run/user/1000/omajuke/jar/1.txt")
+    h.equal(feed.indexOf("--exec"), -1, "feed: unchanged by a write to SIGNED_OUT")
     var first = YtArgs.search(root.tools, root.paths)
     first.push("--exec")
     first[1] = "changed"
@@ -111,6 +167,7 @@ QtObject {
   function run(h) {
     h.vectors(Thumbs, ThumbsVectors)
     root.checkYtArgs(h)
+    root.checkAccount(h)
     root.checkShared(h)
     root.walkUnits(h)
     root.checkLimits(h)

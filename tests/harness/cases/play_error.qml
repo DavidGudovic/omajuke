@@ -18,6 +18,16 @@ QtObject {
 
   readonly property string id: "AAAAAAAAAAA"
 
+  // The steps count lookups. With related tracks on, a track that starts
+  // causes one more, a moment later, and whether it is counted would depend
+  // on that moment. Related tracks have their own cases; here the user has
+  // switched them off.
+  function setup(h, done) {
+    var entry = { id: h.manifest.id, autoplay: false }
+    h.shell.barConfig = { position: "top", layout: { left: [], center: [], right: [entry] } }
+    done()
+  }
+
   function run(h) {
     root.h = h
     h.scenario({ ytdlp: "refused", mpv: "ok" })

@@ -43,14 +43,33 @@ QtObject {
     external_volume_speed: ["idle", "loading 1", "started 1"],
     external_stop: ["idle", "loading 1", "started 1", "idle"],
     foreign_load: ["idle", "loading 1", "started 1", "idle"],
+    playlist_edit: ["idle", "loading 1", "started 1", "loading 2", "started 2"],
+    playlist_burst: ["idle", "loading 1", "started 1"],
+    playlist_remove_current: ["idle", "loading 1", "started 1", "loading 2", "started 2"],
+    playlist_clear: ["idle", "loading 1", "started 1"],
+    play_index_past_end: ["idle", "loading 1", "started 1", "idle"],
+    video_show_hide: ["idle", "loading 1", "started 1"],
+    video_track_change: ["idle", "loading 1", "started 1", "loading 2", "started 2"],
+    video_show_again: ["idle", "loading 1", "started 1"],
+    video_closed: ["idle", "loading 1", "started 1", "videoClosed"],
+    video_add_fails: ["idle", "loading 1", "started 1"],
+    output_select: ["idle", "loading 1", "started 1"],
     lost_load: ["idle", "idle"]
   })
 
+  // The traces in which mpv's playlist is changed by somebody else, or by a
+  // command the player never sends.
+  readonly property var notOurPlaylist: ["external_stop", "foreign_load", "lost_load", "playlist_clear"]
+
   // Plays one trace through the reader and the reducer the way the player
   // does: replies to loads fill the table of playlist entries, and a replace
-  // makes every older entry dead. Returns the signals, the commands that
-  // are not questions about the position, and the number of lines that
-  // could not be read or commands that could not be sent.
+  // makes every older entry dead. mpv's playlist is kept as a list of keys
+  // the way the player keeps it: changed by each command of ours at once,
+  // and set to what mpv reports whenever none of them is unanswered.
+  // Returns the signals, the commands that are not questions about the
+  // position, the number of lines that could not be read or commands that
+  // could not be sent, that list of keys, how often a report differed from
+  // it, and the last value mpv told of each property.
   function replay(trace) {
     var state = PlayerState.initial()
     var entries = new Map()
@@ -59,7 +78,16 @@ QtObject {
     var questions = new Map()
     var requests = 0
     var keys = 0
-    var out = { signals: [], answers: [], unread: 0 }
+    var out = { signals: [], answers: [], unread: 0, keys: [], surprises: 0, last: {} }
+    var edits = new Map()
+    var asked = new Map()
+    var quitting = false
+    var reported = function(data) {
+      if (edits.size > 0) return
+      var now = PlayerState.keysOf(MpvProto.playlistIds(data), entryKind)
+      if (JSON.stringify(now) !== JSON.stringify(out.keys)) out.surprises++
+      out.keys = now
+    }
     var entryKind = function(id) {
       if (entries.has(id)) return { key: entries.get(id), dead: false, live: false }
       return { key: 0, dead: id < floor }
@@ -82,8 +110,20 @@ QtObject {
         if (record.send[0] === "loadfile") {
           keys++
           loads.set(requests, { key: keys, mode: record.send[2] })
+          out.keys = PlayerState.keysAfterLoad(out.keys, keys, record.send[2], record.send[3])
+          edits.set(requests, true)
+        } else if (record.send[0] === "playlist-remove") {
+          out.keys = PlayerState.keysAfterRemove(out.keys, record.send[1])
+          edits.set(requests, true)
+        } else if (record.send[0] === "stop") {
+          out.keys = []
+          edits.set(requests, true)
         }
-        if (record.send[0] === "get_property") questions.set(requests, true)
+        if (record.send[0] === "quit") quitting = true
+        if (record.send[0] === "get_property") {
+          if (record.send[1] === "time-pos") questions.set(requests, true)
+          else asked.set(requests, record.send[1])
+        }
         if (record.send[0] === "seek") take(PlayerState.onLocalSeek(state, record.send[1], record.t))
         continue
       }
@@ -98,6 +138,10 @@ QtObject {
       }
       if (message.kind === "event") {
         take(PlayerState.onEvent(state, message, entryKind, record.t))
+        // What mpv says on its way out is not about the track any more.
+        if (message.event !== "property-change" || quitting) continue
+        out.last[message.name] = message.data
+        if (message.name === "playlist") reported(message.data)
         continue
       }
       var loaded = loads.get(message.request_id)
@@ -108,6 +152,11 @@ QtObject {
           entries = new Map()
         }
         entries.set(id, loaded.key)
+      }
+      edits.delete(message.request_id)
+      if (asked.has(message.request_id) && message.error === "") {
+        out.last[asked.get(message.request_id)] = message.data
+        if (asked.get(message.request_id) === "playlist") reported(message.data)
       }
       if (questions.has(message.request_id) && message.error === "") {
         take(PlayerState.onProperty(state, "time-pos", message.data, record.t))
@@ -123,12 +172,40 @@ QtObject {
       var out = root.replay(fixture.traces[names[i]])
       h.equal(out.signals, root.expected[names[i]], "trace " + names[i])
       h.equal(out.unread, 0, "trace " + names[i] + ": every line is read and every command can be sent")
+      if (root.notOurPlaylist.indexOf(names[i]) === -1) {
+        h.equal(out.surprises, 0, "trace " + names[i] + ": the list of keys is the playlist mpv reports")
+      }
     }
     h.equal(root.replay(fixture.traces.foreign_load).answers, [["stop"]], "a foreign file is stopped")
     h.equal(root.replay(fixture.traces.lost_load).answers, [["stop"]],
       "a foreign file behind our load is stopped")
     h.equal(root.replay(fixture.traces.external_volume_speed).answers,
       [["set_property", "volume", 100], ["set_property", "speed", 1]], "volume and speed are set back")
+  }
+
+  // The playlist as keys after the traces that edit it, and what the
+  // readers make of the last values mpv told.
+  function checkValues(h, fixture) {
+    h.equal(root.replay(fixture.traces.playlist_edit).keys, [1, 2], "appended, inserted, removed twice")
+    h.equal(root.replay(fixture.traces.playlist_burst).keys, [1, 4], "two removals and a load in one write")
+    h.equal(root.replay(fixture.traces.playlist_remove_current).keys, [2], "the playing entry removed")
+    h.equal(root.replay(fixture.traces.foreign_load).keys, [], "nothing is left after a foreign file")
+    var kind = function(id) { return id === 4 ? { key: 9 } : { key: 0, dead: true } }
+    h.equal(PlayerState.keysOf([3, 4, 0], kind), [0, 9, 0], "an entry that is not ours keeps its slot")
+
+    var again = root.replay(fixture.traces.video_show_again).last
+    h.equal([MpvProto.videoTracks(again["track-list"]), MpvProto.trackId(again["vid"]),
+      MpvProto.hasPicture(again["video-params"])], [[1], 1, true], "a video that was added and is shown")
+    var closed = root.replay(fixture.traces.video_closed).last
+    h.equal([MpvProto.trackId(closed["vid"]), MpvProto.hasPicture(closed["video-params"])], [0, false],
+      "after the window was closed: no track selected, no picture")
+    var outputs = root.replay(fixture.traces.output_select).last
+    var list = MpvProto.devices(outputs["audio-device-list"])
+    h.equal(list.map(function(device) { return device.name }),
+      ["auto", "pipewire/stub.speakers", "pipewire/stub.headphones"], "the outputs mpv listed")
+    h.equal(MpvProto.setAudioDevice(list[1].name, list), ["set_property", "audio-device", list[1].name],
+      "a listed output can be selected")
+    h.equal(MpvProto.deviceName(outputs["audio-device"]), "auto", "the output mpv plays on")
   }
 
   // The launch flags, as the real mpv accepted them when the traces were
@@ -181,6 +258,7 @@ QtObject {
     if (fixture === null) { h.finish(); return }
 
     root.checkTraces(h, fixture)
+    root.checkValues(h, fixture)
     root.checkLaunch(h, fixture)
     root.checkReducer(h)
     h.finish()

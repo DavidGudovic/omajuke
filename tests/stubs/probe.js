@@ -7,6 +7,9 @@
 //
 //   echo           print standard input
 //   env            print the names of the environment variables, sorted
+//   value:<name>   print the value of that environment variable, or nothing
+//   state:<text>   add the text to the list the probe keeps between its
+//                  runs, and print the list as JSON
 //   hang           wait until it is ended
 //   linger         print "partial", then wait until it is ended
 //   flood          print without end
@@ -18,6 +21,11 @@
 //   write:<path>   create that file with default permissions
 //   -k ...         what it is given when it is run in place of timeout:
 //                  enforce nothing, start nothing, ignore SIGTERM and wait
+//   --ignore-config ...
+//                  what it is given when it is run in place of yt-dlp to
+//                  export a browser's cookies: write a cookie file of
+//                  invented rows where --cookies points and, like the real
+//                  tool run without an address, exit with 2
 //
 // Anything else is recorded and answered with exit code 64. Every start is
 // recorded through lib.js before the mode does its work.
@@ -26,6 +34,24 @@ var fs = require("fs")
 var lib = require("./lib.js")
 
 var EXIT_UNKNOWN_MODE = 64
+var EXIT_NO_ADDRESS = 2
+
+// One row of a cookie file: seven fields with tabs between them.
+function cookieRow(domain, name, value) {
+  return [domain, "TRUE", "/", "TRUE", "1893456000", name, value].join("\t")
+}
+
+// What the stand-in for a cookie export writes: a signed-in session's two
+// rows for YouTube, one of them marked HttpOnly, among rows of other sites.
+var COOKIE_FILE = [
+  "# Netscape HTTP Cookie File",
+  "# Written by a test.",
+  "",
+  cookieRow(".example.com", "session", "invented-other"),
+  "#HttpOnly_" + cookieRow(".youtube.com", "LOGIN_INFO", "invented-login"),
+  "#HttpOnly_" + cookieRow(".accounts.example", "LOGIN_INFO", "invented-elsewhere"),
+  cookieRow(".youtube.com", "SAPISID", "invented-key")
+].join("\n") + "\n"
 
 var stub = lib.start("probe")
 var mode = String(process.argv[2] || "")
@@ -55,6 +81,18 @@ if (name === "echo") {
   stub.recordStart(null)
   process.stdout.write(Object.keys(process.env).sort().join("\n") + "\n")
   finish(0)
+} else if (name === "value") {
+  stub.recordStart(null)
+  var value = Object.prototype.hasOwnProperty.call(process.env, arg) ? process.env[arg] : ""
+  process.stdout.write(value + "\n")
+  finish(0)
+} else if (name === "state") {
+  stub.recordStart(null)
+  var kept = stub.readState([])
+  var list = Array.isArray(kept) ? kept.concat([arg]) : [arg]
+  stub.writeState(list)
+  process.stdout.write(JSON.stringify(list) + "\n")
+  finish(0)
 } else if (name === "hang") {
   stub.recordStart(null)
   wait()
@@ -73,6 +111,13 @@ if (name === "echo") {
   process.on("SIGTERM", function() {})
   stub.recordStart(null)
   wait()
+} else if (name === "--ignore-config") {
+  stub.recordStart(null)
+  var flag = process.argv.indexOf("--cookies")
+  if (flag !== -1 && typeof process.argv[flag + 1] === "string") {
+    fs.writeFileSync(process.argv[flag + 1], COOKIE_FILE)
+  }
+  finish(EXIT_NO_ADDRESS)
 } else if (name === "tree") {
   // The second probe gets no pipe of ours: it must not keep the runner's
   // read of this process's output open.

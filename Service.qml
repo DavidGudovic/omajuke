@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 import "core"
 import "lib/Clean.js" as Clean
 import "lib/Const.js" as Const
@@ -22,7 +23,9 @@ import "lib/Ids.js" as Ids
 // service is ready, when nothing may be started (a tool is missing, or the
 // session has a proxy the user has not been told about), how many panels
 // are open, and when playback and the panels have both come to rest, so
-// that the files of looked-up tracks can go.
+// that the files of looked-up tracks can go. It also hears the one thing
+// the compositor tells the plugin, that its configuration was loaded
+// again, and passes that on to the parts that keep something inside it.
 Item {
   id: root
 
@@ -112,7 +115,8 @@ Item {
 
   // ---- Lists and queue ----
 
-  // Queue items: a track plus "key" and "auto". A new array on every change.
+  // Queue items: a track plus "key" (which names the item in the queue
+  // functions below) and "auto". A new array on every change.
   readonly property var queue: playback.queue
   readonly property int queueIndex: playback.queueIndex
   // Tracks, most recent first, each video once.
@@ -138,6 +142,68 @@ Item {
   // True while at least one panel is open.
   readonly property bool panelOpen: _panels > 0
 
+  // ---- Video window ----
+
+  // hidden, loading, shown or unavailable (the picture is wanted, but this
+  // track has none or the window cannot be opened; videoNote says which).
+  readonly property string videoState: videoWindow.videoState
+  readonly property string videoNote: videoWindow.videoNote
+
+  // ---- Shortcuts ----
+
+  // One row per action: { action, label, combo, status, proposal, note },
+  // status being unassigned, assigned, config, blocked or failed.
+  readonly property var shortcuts: shortcutKeys.rows
+  // What stands between a shortcut and the compositor: ok, version,
+  // config-errors or no-hyprland.
+  readonly property string shortcutsGate: shortcutKeys.gate
+  readonly property bool shortcutsBusy: shortcutKeys.busy
+
+  // ---- Audio output ----
+
+  // { name, label, current } per output. Empty while nothing plays: the
+  // list is mpv's.
+  readonly property var outputs: audioOutputs.outputs
+  // What to call the output in use, or the saved choice while nothing plays.
+  readonly property string outputName: audioOutputs.outputName
+  // A notice code while the system default stands in for a chosen output
+  // that is gone, or "".
+  readonly property string outputNote: audioOutputs.outputNote
+
+  // ---- Sign-in and feeds ----
+
+  // True while requests may carry the saved login.
+  readonly property bool signedIn: signIn.signedIn
+  // off, confirm, browser, exporting, verifying, on or failed.
+  readonly property string signInState: signIn.status
+  // Why the last attempt failed, or that YouTube ended the session; and,
+  // after a sign-out, that the saved login could not be deleted.
+  readonly property string signInError: signIn.errorCode !== "" ? signIn.errorCode
+    : (signIn.loginLeft ? "E_SIGNOUT_LEFT" : "")
+  // True while a login file lies in the data folder, whether or not anybody
+  // is signed in with it: the page offers to delete it in every state.
+  readonly property bool loginSaved: signIn.hasLogin
+  // The browser a sign-in would open, once it is known.
+  readonly property string signInBrowserPath: signIn.browserPath
+  // The list of the account that is shown ("" for none), its state (idle,
+  // loading, rows, empty or error), its rows and the code of its failure.
+  // A row has "key", which names it in openFeedRow().
+  readonly property string feedKind: feeds.kind
+  readonly property string feedState: feeds.status
+  readonly property var feedRows: feeds.rows
+  readonly property string feedError: feeds.errorCode
+  // The title of the playlist whose videos are the rows, "" while a list
+  // itself is shown. It is YouTube's text: shown as plain text only.
+  readonly property string feedTitle: feeds.listTitle
+
+  // ---- Sponsor segments ----
+
+  // True while the question whether sponsor segments should be skipped
+  // waits for its answer. It is asked once and never opens the panel.
+  readonly property bool sponsorPrompt: sponsor.prompt
+  // { category, from, to } of a skip that just happened, or null.
+  readonly property var lastSkip: sponsor.lastSkip
+
   // ---- Private ----
 
   // True while nothing may be started: before start-up has finished, while a
@@ -159,12 +225,29 @@ Item {
   // service, and from then on the settings are no longer the user's word.
   property bool _hadShell: false
 
+  // The watched report is a choice made for the account that is signed in.
+  // True when it is on although nobody is: the user signed out, YouTube
+  // ended the session, or the login went with the plugin being switched
+  // off. It is switched off then, so that it never passes to the next login
+  // unseen.
+  readonly property bool _strayWatchedReport: signIn.known && !signIn.signedIn
+    && settingsStore.values.markWatched === true
+
   // Open panels, and main pages that show the position. Each panel reports
   // its opening and its closing, and this counts.
   property int _panels: 0
   property int _watchers: 0
   property bool _stateNoticeRead: false
   property bool _tidyPending: false
+  // An output was asked for from outside the panel. It stays true: whoever
+  // steps through the outputs with a key does so again.
+  property bool _outputsAsked: false
+  // Whether mpv is asked which outputs there are. Only while somebody can
+  // use the answer: a panel is open, a shortcut for the next output is
+  // saved, or one was asked for over IPC. To list them mpv turns to the
+  // sound server, and playback should not depend on that for nothing. (A
+  // saved output keeps the list coming by itself: the player needs it.)
+  readonly property bool _outputsWanted: panelOpen || _outputsAsked || store.values.shortcuts.output !== ""
   // Shared with every deferred call, so that none of them runs into a
   // service that is already being destroyed.
   property var _life: ({ alive: true })
@@ -178,7 +261,9 @@ Item {
   // mpv is gone). Nothing in the plugin reads this.
   readonly property var _parts: ({
     runner: runner, fs: fs, store: store, settings: settingsStore, player: player,
-    search: search, resolver: resolver, thumbs: thumbnails, playback: playback
+    search: search, resolver: resolver, thumbs: thumbnails, playback: playback,
+    hypr: hyprCtl, video: videoWindow, shortcuts: shortcutKeys, outputs: audioOutputs,
+    signIn: signIn, feeds: feeds, sponsor: sponsor
   })
 
   // ---- Identity and readiness ----
@@ -198,6 +283,7 @@ Item {
   // ---- Playback ----
 
   function playPause(): bool {
+    sponsor.userActed()
     return playback.playPause()
   }
 
@@ -206,15 +292,27 @@ Item {
   }
 
   function next(): bool {
+    sponsor.userActed()
     return playback.next()
   }
 
   function previous(): bool {
+    sponsor.userActed()
     return playback.previous()
   }
 
   function seekTo(seconds: real): bool {
+    sponsor.userActed()
     return playback.seekTo(seconds)
+  }
+
+  // Tries the track that needs a signed-in account once more, with the
+  // saved login. Only for the track whose error says so, and only because
+  // the user asked: nothing else ever plays with the account.
+  function playWithAccount(): bool {
+    if (!root.signedIn) return false
+    sponsor.userActed()
+    return playback.playWithAccount()
   }
 
   function dismissNotice() {
@@ -254,22 +352,50 @@ Item {
   // Plays a row the panel hands back, as a queue of one. The row is checked
   // again on the way in: the panel is not trusted to return what it got.
   function playTrack(track: var): bool {
+    sponsor.userActed()
     return playback.playTrack(track)
   }
 
+  // Adds a row at the end of the queue, and starts it when nothing plays.
+  // False for a row that is no track and for a queue at its limit.
+  function enqueueTrack(track: var): bool {
+    sponsor.userActed()
+    return playback.enqueueTrack(track)
+  }
+
   // The search box's Enter. Answers "empty" (nothing was started), "video"
-  // (a video link, which now plays), "link" (text that looks like a link, an
-  // address or a path and is no video link: it is not sent anywhere and
-  // not kept, the page that asked shows the message) or "query" (a search
-  // was started). Queueing arrives with the queue; until then a video link
-  // is played whatever the second argument says.
+  // (a video link, which now plays, or waits at the end of the queue when
+  // enqueue is true), "link" (text that looks like a link, an address or a
+  // path and is no video link: it is not sent anywhere and not kept, the
+  // page that asked shows the message) or "query" (a search was started).
   function submit(text: string, enqueue: bool): string {
     var entered = text.trim()
     if (entered === "") return "empty"
     var id = Ids.parseVideoRef(entered, false)
-    if (id !== "") return !root._hold && playback.playId(id) ? "video" : "empty"
+    if (id !== "") return root._startId(id, enqueue) === "ok" ? "video" : "empty"
     if (Ids.looksLikeUrl(entered)) return "link"
     return !root._hold && search.submit(Clean.query(entered)) ? "query" : "empty"
+  }
+
+  // The queue, item by item. An item is named by its key; a key the queue
+  // does not hold changes nothing and answers false.
+  function queuePlay(key: int): bool {
+    sponsor.userActed()
+    return playback.queuePlay(key)
+  }
+
+  function queueRemove(key: int): bool {
+    return playback.queueRemove(key)
+  }
+
+  // Moves an item by delta places, towards the end for a positive one.
+  function queueMove(key: int, delta: int): bool {
+    return playback.queueMove(key, delta)
+  }
+
+  // Empties the queue around the track that plays, which goes on.
+  function queueClear() {
+    playback.queueClear()
   }
 
   // Forgets what was played and searched, with the files that belong to
@@ -281,6 +407,17 @@ Item {
     resolver.purge(playback.keepIds())
     thumbnails.purge()
     store.flushNow()
+  }
+
+  // A panel says which search result its highlight rests on, or "" for
+  // none. A row the highlight stays on is looked up ahead, so that Enter
+  // starts it at once; the resolver decides whether and when. The host is
+  // asked first whether a panel is really open: without one nothing is
+  // looked up for a highlight.
+  function hintHighlight(id: string) {
+    if (root._hold) return
+    root._panelsOpen()
+    resolver.hint(id)
   }
 
   // ---- Search ----
@@ -343,6 +480,111 @@ Item {
     return facade && typeof facade.toggle === "function" ? facade.toggle(root.pluginId, "") === true : false
   }
 
+  // ---- Video window ----
+
+  // The picture of what plays, in a window of its own. Each answers false
+  // when it changed nothing; why a window did not come is in videoNote.
+  function showVideo(): bool {
+    return videoWindow.showVideo()
+  }
+
+  function hideVideo(): bool {
+    return videoWindow.hideVideo()
+  }
+
+  function toggleVideo(): bool {
+    return videoWindow.toggleVideo()
+  }
+
+  // Forgets where the window was left on every monitor: the settings
+  // decide its size and corner again.
+  function resetVideoPlacement() {
+    if (root.ready) videoWindow.resetPlacement()
+  }
+
+  // ---- Shortcuts ----
+
+  // The shortcuts page was opened: the compositor's list is read again.
+  function refreshShortcuts(): bool {
+    return root.ready && shortcutKeys.refresh()
+  }
+
+  // True when the wish was saved; what came of it is in shortcuts.
+  function assignShortcut(action: string, combo: string): bool {
+    return root.ready && shortcutKeys.assign(action, combo)
+  }
+
+  function unassignShortcut(action: string): bool {
+    return root.ready && shortcutKeys.unassign(action)
+  }
+
+  // Puts the line for the user's own key configuration on the clipboard.
+  function copyShortcutLine(action: string, combo: string): bool {
+    return shortcutKeys.copyLine(action, combo)
+  }
+
+  // A key press as Qt reports it, as a combination a shortcut can have, or
+  // "" when it is none.
+  function comboFromKeyEvent(key: int, modifiers: int): string {
+    return shortcutKeys.comboFromKeyEvent(key, modifiers)
+  }
+
+  // ---- Audio output ----
+
+  // Chooses where this player's sound goes, by a name from outputs. False
+  // for a name that is not on the list, which none is while nothing plays.
+  function setOutput(name: string): bool {
+    return audioOutputs.setOutput(name)
+  }
+
+  // Moves on to the next output of the list.
+  function cycleOutput(): bool {
+    return audioOutputs.cycleOutput()
+  }
+
+  // ---- Sign-in and feeds ----
+
+  // The steps of signing in, each asked for by the account page and by
+  // nothing else: no IPC method leads here.
+  function beginSignIn(): bool {
+    return signIn.beginSignIn()
+  }
+
+  function confirmSignIn(): bool {
+    return signIn.confirmSignIn()
+  }
+
+  function cancelSignIn(): bool {
+    return signIn.cancelSignIn()
+  }
+
+  function signOut(): bool {
+    return signIn.signOut()
+  }
+
+  // Shows a list of the account, or with "" none of them.
+  function selectFeed(kind: string): bool {
+    if (kind !== "") return feeds.select(kind)
+    feeds.deselect()
+    return true
+  }
+
+  // The user chose a row of the shown list, named by its key. A video is
+  // played, and the answer says whether it was taken; a playlist is read
+  // into feedRows instead.
+  function openFeedRow(key: int): bool {
+    var track = feeds.openRow(key)
+    return track !== null && root.playTrack(track)
+  }
+
+  // ---- Sponsor segments ----
+
+  // The user's answer to sponsorPrompt. It becomes the setting, and the
+  // setting is what switches skipping on.
+  function answerSponsorPrompt(enable: bool) {
+    sponsor.answer(enable)
+  }
+
   // ---- Start-up ----
 
   // True when one of the variables that would make a tool use a proxy is
@@ -379,6 +621,9 @@ Item {
       store.flushNow()
     }
     root._settled = true
+    // The saved shortcuts are looked after from here on. Without one saved
+    // the compositor is not even asked.
+    shortcutKeys.start()
   }
 
   // One of the three privacy choices was made, in the panel or in the
@@ -397,7 +642,13 @@ Item {
   function _count(panels, watchers) {
     root._panels = Math.max(0, panels)
     root._watchers = Math.max(0, watchers)
-    player.setPositionWatch(root._watchers > 0)
+    root._watchPosition()
+  }
+
+  // mpv reports the position while a page shows it, and while a segment to
+  // skip lies ahead, which has to be noticed with every panel closed.
+  function _watchPosition() {
+    player.setPositionWatch(root._watchers > 0 || sponsor.watching)
   }
 
   // Whether a panel is open, after asking the host. The counts rest on
@@ -443,6 +694,39 @@ Item {
     root._tidyPending = false
     if (playback.status !== "idle" || root._panelsOpen()) return
     resolver.purge(playback.keepIds())
+  }
+
+  function _dropWatchedReport() {
+    if (root._strayWatchedReport) root.setSetting("markWatched", false)
+  }
+
+  // ---- Starting a video by its id ----
+
+  // Plays the video as a queue of one, or adds it to the end of the queue.
+  // Its title arrives with the lookup. Answers "ok", "full" for a queue at
+  // its limit, or "unavailable" when nothing may be started.
+  function _startId(id, enqueue) {
+    if (root._hold) return "unavailable"
+    sponsor.userActed()
+    if (enqueue) return playback.enqueueId(id)
+    return playback.playId(id) ? "ok" : "unavailable"
+  }
+
+  // ---- The compositor ----
+
+  // The code behind the connection to the compositor at the end of this
+  // file, so that a test can say what the compositor would. One event
+  // matters: the configuration was loaded again. That usually wipes what
+  // was made inside the compositor at runtime, the window rule and the key
+  // binds, and a configuration that failed to load keeps them. The parts
+  // find out which, each a moment later (such events come in bursts); the
+  // compositor access is told at once, because an answer that is on its
+  // way to it was given for the configuration before.
+  function _hyprEvent(name) {
+    if (name !== "configreloaded") return
+    hyprCtl.noteReload()
+    videoWindow.compositorReloaded()
+    shortcutKeys.compositorReloaded()
   }
 
   // ---- IPC ----
@@ -502,20 +786,17 @@ Item {
     return root.stop() ? "ok" : "unhandled"
   }
 
-  // The video plays as a queue of one. Its title arrives with the lookup.
+  // The video plays as a queue of one.
   function _ipcPlay(target) {
     var id = root._ipcVideoId(target)
-    if (id === "") return "invalid"
-    if (root._hold) return "unavailable"
-    return playback.playId(id) ? "ok" : "unavailable"
+    return id === "" ? "invalid" : root._startId(id, false)
   }
 
-  // Until there is a queue to append to, this plays when nothing else does
-  // and declines otherwise.
+  // The video goes to the end of the queue, and plays when nothing else
+  // does. "full" for a queue at its limit.
   function _ipcEnqueue(target) {
-    if (root._ipcVideoId(target) === "") return "invalid"
-    if (root._hold) return "unavailable"
-    return root.playbackState === "idle" ? root._ipcPlay(target) : "unhandled"
+    var id = root._ipcVideoId(target)
+    return id === "" ? "invalid" : root._startId(id, true)
   }
 
   // A query has to survive cleaning, and text that looks like a link, an
@@ -534,12 +815,42 @@ Item {
     return "ok"
   }
 
+  // One of three words, and nothing else is looked at.
+  function _ipcVideo(action) {
+    if (action === "toggle") return root.toggleVideo() ? "ok" : "unhandled"
+    if (action === "show") return root.showVideo() ? "ok" : "unhandled"
+    if (action === "hide") return root.hideVideo() ? "ok" : "unhandled"
+    return "invalid"
+  }
+
+  // "next", or the name of an output that is on mpv's list right now. A
+  // name is only ever compared with that list. The first request of a
+  // session is what makes mpv list its outputs at all, so "next" may come
+  // before the list: with a player running the step is taken when the list
+  // arrives, and only without one is there nothing to step through.
+  function _ipcOutput(name) {
+    var text = root._ipcText(name)
+    if (text === null) return "invalid"
+    root._outputsAsked = true
+    if (text === "next") return audioOutputs.cycleOutputSoon() ? "ok" : "unhandled"
+    return root.setOutput(text) ? "ok" : "invalid"
+  }
+
+  // The name of the output in use, "" for the system default. While
+  // nothing plays there is no list, and the saved choice is all there is.
+  function _outputInUse() {
+    var list = root.outputs
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].current === true) return list[i].name === "auto" ? "" : list[i].name
+    }
+    return store.values.outputDevice
+  }
+
   // Holds nothing that the desktop's media interface does not already
-  // publish, plus counters: no path and no account detail. Without a
-  // current track the position is 0, like every other fact about a track:
-  // the player still knows where the last one stopped. The last keys
-  // belong to features of later versions and are constant until those
-  // exist, so that a script written against this version keeps working.
+  // publish, plus counters, the state of the video window, the name of the
+  // audio output and whether a login is in use: no path and no account
+  // detail. Without a current track the position is 0, like every other
+  // fact about a track: the player still knows where the last one stopped.
   function _ipcStatus() {
     var track = root.currentTrack
     return JSON.stringify({
@@ -555,9 +866,9 @@ Item {
       muted: root.muted,
       queueLength: root.queue.length,
       queueIndex: root.queueIndex,
-      video: "hidden",
-      output: "",
-      signedIn: false,
+      video: root.videoState,
+      output: root._outputInUse(),
+      signedIn: root.signedIn,
       updatePending: root._updatePending(),
       error: root.errorCode
     })
@@ -565,16 +876,27 @@ Item {
 
   onShellChanged: if (root.shell) root._hadShell = true
   on_StartableChanged: if (root._startable) root._later(root._settle)
+  // A turn later: the write changes what this very property is made of.
+  on_StrayWatchedReportChanged: if (root._strayWatchedReport) root._later(root._dropWatchedReport)
   onPanelOpenChanged: if (!root.panelOpen) root._tidySoon()
 
   // The private directories are checked and made before anything else runs.
   Component.onCompleted: fs.prepare()
-  // The parts and their child processes end with this object. What they
-  // left in the runtime directory is removed by a detached command, the
-  // one thing that can outlive this moment. No state is written here.
+  // The parts and their child processes end with this object, and the
+  // shortcuts part takes its key binds out of the compositor on its own way
+  // out. What the parts left in the runtime directory is removed by a
+  // detached command, the one thing that can outlive this moment. No state
+  // is written here.
+  //
+  // The host takes its facade away before it destroys the service of a
+  // plugin that is being switched off or removed, and not when the shell
+  // merely ends. Only then does the saved login go as well: a plugin that
+  // was removed leaves no YouTube login behind, and a restart of the shell
+  // signs nobody out. A login that a sign-in was still saving or trying
+  // out goes in either case: nobody has seen it work.
   Component.onDestruction: {
     root._life.alive = false
-    fs.cleanupDetached()
+    fs.cleanupDetached((root._hadShell && !root.shell) || signIn.unproven)
   }
 
   // ---- The parts ----
@@ -616,6 +938,9 @@ Item {
     startVolume: store.values.volume
     startMuted: store.values.muted
     evenVolume: settingsStore.values.evenVolume
+    // The saved output is chosen before the first track of a fresh mpv.
+    startDevice: store.values.outputDevice
+    watchOutputs: root._outputsWanted
     // A media key changes these as well as the panel does, so they are
     // saved where they change. Each is compared with its own saved value:
     // when the state is loaded the two do not arrive in the same step.
@@ -637,6 +962,9 @@ Item {
     fs: fs
     settings: settingsStore.values
     panelOpen: root.panelOpen
+    // For the one lookup the user asks to be made with the account. The
+    // resolver never sees the saved login: it hands the call over.
+    account: signIn
   }
 
   Thumbnails {
@@ -653,11 +981,94 @@ Item {
     resolver: resolver
     store: store
     settings: settingsStore.values
+    // Related tracks, for when the queue runs out.
+    mixer: search
     persistHistory: root._persistHistory
     hold: root._hold
     onStatusChanged: root._playbackMoved()
     // A track change is a moment at which the position watch matters again.
     onTrackStarted: function(item) { root._panelsOpen() }
+  }
+
+  HyprCtl {
+    id: hyprCtl
+    runner: runner
+    tools: root.tools
+  }
+
+  VideoWindow {
+    id: videoWindow
+    player: player
+    playback: playback
+    resolver: resolver
+    hyprCtl: hyprCtl
+    store: store
+    settings: settingsStore.values
+  }
+
+  Shortcuts {
+    id: shortcutKeys
+    hyprCtl: hyprCtl
+    store: store
+  }
+
+  AudioOutputs {
+    id: audioOutputs
+    store: store
+    deviceList: player.audioDevices
+    activeDevice: player.audioDevice
+    playerRuns: player.mpvState === "starting" || player.mpvState === "running"
+    // The player stays the only thing that writes to mpv.
+    onDeviceWanted: function(name) { player.setAudioDevice(name) }
+  }
+
+  SignIn {
+    id: signIn
+    runner: runner
+    tools: root.tools
+    fs: fs
+    settings: settingsStore.values
+    hold: root._hold
+    playbackStatus: playback.status
+    currentTrack: playback.current
+    // The user signed out, or YouTube ended the session. The lists of the
+    // account are dropped by the part that holds them. The pictures fetched
+    // for their rows go here, with every other picture: which is which is
+    // not kept, and a row that is shown later asks again.
+    onSignedInChanged: if (!signIn.signedIn) thumbnails.purge()
+    // What was looked up with the account goes with the login.
+    onSignedOut: resolver.purge(playback.keepIds())
+  }
+
+  Feeds {
+    id: feeds
+    tools: root.tools
+    fs: fs
+    signIn: signIn
+  }
+
+  Sponsor {
+    id: sponsor
+    runner: runner
+    tools: root.tools
+    fs: fs
+    settings: settingsStore.values
+    player: player
+    playback: playback
+    // Talk in a music video is skipped only while its picture is not seen.
+    videoHidden: videoWindow.videoState === "hidden" || videoWindow.videoState === "unavailable"
+    onAnswered: function(enable) { root.setSetting("sponsorSkip", enable) }
+    onWatchingChanged: root._watchPosition()
+  }
+
+  // The compositor says when its configuration was loaded again. Nothing
+  // else of what it reports is looked at, and nothing is ever sent this way.
+  Connections {
+    target: Hyprland
+
+    function onRawEvent(event) {
+      root._hyprEvent(String(event.name))
+    }
   }
 
   // The only handler in the plugin: a second one for the same target, such
@@ -705,6 +1116,14 @@ Item {
 
     function search(query: string): string {
       return root._ipcSearch(query)
+    }
+
+    function video(action: string): string {
+      return root._ipcVideo(action)
+    }
+
+    function output(name: string): string {
+      return root._ipcOutput(name)
     }
 
     function status(): string {

@@ -18,6 +18,14 @@ QtObject {
   readonly property string idA: "AAAAAAAAAAA"
   readonly property string idB: "BBBBBBBBBBB"
 
+  // Related tracks are another case's subject. Here the user has switched
+  // them off, so a queue ends where the user's own tracks end.
+  function setup(h, done) {
+    var entry = { id: h.manifest.id, autoplay: false }
+    h.shell.barConfig = { position: "top", layout: { left: [], center: [], right: [entry] } }
+    done()
+  }
+
   function run(h) {
     root.h = h
     h.scenario({ ytdlp: "ok", mpv: "ok", curl: "ok" })
@@ -73,6 +81,10 @@ QtObject {
       h.equal(s.submit("https://youtu.be/" + root.idA, false), "empty", "held: a link is not played")
       h.equal(s.submit("file:///etc/hostname", false), "link", "held: other links are told apart as always")
       h.equal(s.playTrack(root.row(root.idA)), false, "held: a row is not played")
+      h.equal(s.enqueueTrack(root.row(root.idA)), false, "held: nor queued")
+      s.hintHighlight(root.idA)
+      h.equal([s.beginSignIn(), s.selectFeed("subs"), s.playWithAccount()], [false, false, false],
+        "held: nothing of an account is begun")
       h.equal(s.playPause(), false, "held: nothing to resume")
       s.wantThumbs([root.idA, root.idB])
       h.equal([s._ipcPlay(root.idA), s._ipcEnqueue(root.idA), s._ipcSearch("some words")],
@@ -87,7 +99,9 @@ QtObject {
     var s = h.service
     h.after(600, function() {
       h.equal(root.records(), [0, 0, 0], "held: zero yt-dlp, curl and mpv records")
-      h.equal(h.jobs().map(function(job) { return job.tag }), ["prepare"], "held: no job but the preparation")
+      // Both look at folders of this machine and ask nobody.
+      h.equal(h.jobs().map(function(job) { return job.tag }), ["prepare", "prepare-data"],
+        "held: no job but the two preparations")
       h.equal([s.playbackState, s.searchState, s.searchQuery, s.queue.length], ["idle", "idle", "", 0],
         "held: no state moved, no text was kept")
       h.equal(Object.keys(s.thumbs), [], "held: no picture")

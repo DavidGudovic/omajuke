@@ -4,10 +4,11 @@ import "../../lib/Const.js" as Const
 // A scripted stand-in for core/Resolver.qml, for cases that test what is
 // handed a resolver without yt-dlp, files or a process runner. It has the
 // functions such a component may call and no others, writes every command
-// down in "calls", and answers a request only when the case says so: with
-// succeed() or fail(). The callback of a request therefore never runs inside
-// ensure() or refresh(), which is the one promise of the real resolver that
-// its callers build on.
+// down in "calls", and answers a lookup only when the case says so: with
+// succeed() or fail() for the oldest that waits, with succeedFor() or
+// failFor() for every one that waits for a given video. The callback of a
+// lookup therefore never runs inside the call that made it, which is the
+// one promise of the real resolver that its callers build on.
 //
 // It keeps a small cache of made-up entries, so that fresh(), entry() and
 // the "cached" flag of an answer tell the same story as the real thing: an
@@ -74,6 +75,45 @@ QtObject {
     if (!request) return false
     request.done({ ok: false, code: code, entry: null, cached: false })
     return true
+  }
+
+  // Answers every waiting request for this video with one entry, as the
+  // real resolver does when a play joins a lookup that is already running.
+  // Returns how many were answered.
+  function succeedFor(id, fields) {
+    var mine = root._take(id)
+    for (var i = 0; i < mine.length; i++) {
+      var found = mine[i].hit
+      if (found === null) {
+        found = i === 0 ? root._newEntry(id, fields) : root._cache.get(id)
+        root._cache.set(id, found)
+      }
+      mine[i].done({ ok: true, code: "", entry: found, cached: mine[i].hit !== null })
+    }
+    return mine.length
+  }
+
+  // Fails every waiting request for this video. Returns how many.
+  function failFor(id, code) {
+    var mine = root._take(id)
+    for (var i = 0; i < mine.length; i++) mine[i].done({ ok: false, code: code, entry: null, cached: false })
+    return mine.length
+  }
+
+  // The purposes of the waiting requests, oldest first.
+  function purposes() {
+    return root._waiting.map(function(request) { return request.purpose })
+  }
+
+  function _take(id) {
+    var mine = []
+    var rest = []
+    for (var i = 0; i < root._waiting.length; i++) {
+      if (root._waiting[i].id === id) mine.push(root._waiting[i])
+      else rest.push(root._waiting[i])
+    }
+    root._waiting = rest
+    return mine
   }
 
   // Hands every request cancelPlay() dropped the result "cancelled", which
@@ -149,6 +189,28 @@ QtObject {
   function refresh(id, done) {
     root._record("refresh", [id])
     root._wait(id, "play", done, null)
+  }
+
+  // The lookup that carries the saved login: always a new one, in the
+  // place of a play.
+  function refreshWithAccount(id, done) {
+    root._record("refreshWithAccount", [id])
+    root._wait(id, "play", done, null)
+  }
+
+  // Looks the video address of a cached entry up again. The stand-in
+  // answers at once with what it has, on the next turn like the real one.
+  function refreshVideoUrl(id, done) {
+    root._record("refreshVideoUrl", [id])
+    var found = root._cache.get(id)
+    var answer = found === undefined ? { ok: false, code: "E_YTDLP_FAILED", videoUrl: "" }
+      : { ok: true, code: "", videoUrl: found.videoUrl }
+    if (typeof done === "function") Qt.callLater(done, answer)
+  }
+
+  // The highlighted search row; the real resolver may look it up early.
+  function hint(id) {
+    root._record("hint", [id])
   }
 
   function cancelPlay() {

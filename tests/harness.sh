@@ -58,12 +58,16 @@ else
 fi
 
 # Per-case environment. The signature is a dummy: no socket exists for it under
-# the private runtime dir, so nothing can reach a compositor.
+# the private runtime dir, so nothing can reach a compositor. The cursor theme
+# is a dummy as well: it stands for what a session tells a window, so that a
+# case can see which children are handed it.
 HIS=oj-harness-dummy
 PROXY=
+CURSOR=
 case "$CASE" in
   hypr_none) HIS= ;;
   proxy_hold) PROXY=http://127.0.0.1:9 ;;
+  runner) CURSOR=oj-harness-dummy ;;
 esac
 
 env -i HOME="$RUN/sbx/home" XDG_RUNTIME_DIR="$RUN" XDG_STATE_HOME="$RUN/sbx/state" \
@@ -71,6 +75,7 @@ env -i HOME="$RUN/sbx/home" XDG_RUNTIME_DIR="$RUN" XDG_STATE_HOME="$RUN/sbx/stat
   PATH=/usr/bin LANG=C.UTF-8 QT_QPA_PLATFORM=offscreen \
   QS_DISABLE_CRASH_HANDLER=1 QS_NO_RELOAD_POPUP=1 QS_DISABLE_FILE_WATCHER=1 \
   ${HIS:+HYPRLAND_INSTANCE_SIGNATURE="$HIS"} ${PROXY:+https_proxy="$PROXY"} \
+  ${CURSOR:+XCURSOR_THEME="$CURSOR"} \
   OMAJUKE_REPO="$REPO" OMAJUKE_KIND="$KIND" OMAJUKE_CASE="$CASE" \
   /usr/bin/timeout -k 2 60 "$QS" -p "$ROOT/shell.qml" > "$RUN/out.txt" 2>&1 &
 WRAP=$!

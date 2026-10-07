@@ -3,9 +3,10 @@ import "../../../lib/Paths.js" as Paths
 import "../../../lib/Sh.js" as Sh
 
 // The file operations of core/PrivateFs.qml with the real shell and
-// coreutils: a private, atomic write; a read that is capped; removal; and
-// the refusal, without any job, of every path that is not exactly a file
-// the plugin creates.
+// coreutils: a private, atomic write; a read that is capped; removal; the
+// refusal, without any job, of every path that is not exactly a file the
+// plugin creates or not one that operation is meant for; and the files of
+// signing in, from the data directory to a saved login and its removal.
 QtObject {
   id: root
 
@@ -29,7 +30,7 @@ QtObject {
     if (root.runner === null || root.fs === null) { h.finish(); return }
     root.steps = [
       root.writeState, root.replaceState, root.writeInfo, root.refusals, root.readCapped, root.removeFiles,
-      root.purge
+      root.purge, root.signInDirs, root.exportLogin, root.useLogin, root.forgetLogin
     ]
     root.fs.prepared.connect(function(ok) {
       h.check(ok, "the directories are prepared")
@@ -132,7 +133,9 @@ QtObject {
       paths.runtimeDir + "/x.json", paths.stateFile + ".bak", paths.stateDir + "/other.json",
       paths.infoDir + "/a.json", paths.infoDir + "/1.json/", paths.infoDir + "/../1.json",
       paths.infoDir + "/1.json\n", paths.infoDir + "//1.json", paths.infoDir + "/12345678901.json",
-      paths.sock, paths.jarFile, paths.infoDir + "/", "/etc/hostname", "state.json", "", null, undefined, 7
+      paths.sock, paths.infoDir + "/", "/etc/hostname", "state.json", "", null, undefined, 7,
+      paths.jarFile + ".bak", paths.dataDir + "/other.txt", paths.jarDir + "/a.txt", paths.jarDir + "/1.json",
+      paths.signinDir + "/1/profile", paths.signinDir + "/1/export.txt", paths.signinDir + "/a"
     ]
     var returned = false
     for (var i = 0; i < foreign.length; i++) {
@@ -144,9 +147,10 @@ QtObject {
       root.fs.remove([foreign[i]], note)
       root.fs.remove([Paths.infoFile(paths, 1), foreign[i]], note)
       root.fs.purgeDir(foreign[i], note)
+      root.fs.removeTree(foreign[i], note)
     }
     returned = true
-    var asked = foreign.length * 5
+    var asked = foreign.length * 6
     // Ours, but not for this operation or not in this form.
     root.fs.write(Paths.thumbFile(paths, 1), "x", note)
     root.fs.write(paths.stateFile, 5, note)
@@ -160,6 +164,47 @@ QtObject {
     root.fs.purgeDir(paths.stateDir, note)
     root.fs.purgeDir(paths.ytCacheDir, note)
     asked += 11
+    // The saved login can be removed and nothing else: it is never read
+    // back and never written as text. Its copies likewise.
+    var attempt = Paths.signinAttemptDir(paths, 1)
+    var guarded = [paths.jarFile, Paths.jarCopyFile(paths, 1), attempt]
+    for (var g = 0; g < guarded.length; g++) {
+      root.fs.write(guarded[g], "x", note)
+      root.fs.read(guarded[g], 64, note)
+      root.fs.purgeDir(guarded[g], note)
+    }
+    asked += 9
+    // A sign-in attempt is a directory: it goes whole or not at all, and
+    // nothing else goes that way.
+    root.fs.remove([attempt], note)
+    root.fs.remove([paths.jarFile, attempt], note)
+    var trees = [
+      paths.signinDir, paths.runtimeDir, paths.runtimeBase, paths.infoDir, paths.jarDir, paths.dataDir,
+      paths.stateDir, paths.jarFile, paths.stateFile, Paths.infoFile(paths, 1), Paths.jarCopyFile(paths, 1),
+      attempt + "/", attempt + "/..", "/"
+    ]
+    for (var t = 0; t < trees.length; t++) root.fs.removeTree(trees[t], note)
+    root.fs.purgeDir(paths.signinDir, note)
+    root.fs.purgeDir(paths.dataDir, note)
+    asked += 4 + trees.length
+    // The operations of signing in take a counter and a name from a list.
+    root.fs.copyJar(0, note)
+    root.fs.copyJar("1", note)
+    root.fs.copyJar(null, note)
+    root.fs.makeSigninDirs(0, "chromium", "", note)
+    root.fs.makeSigninDirs("1", "chromium", "", note)
+    root.fs.makeSigninDirs(1, "opera", "", note)
+    root.fs.makeSigninDirs(1, "constructor", "", note)
+    root.fs.makeSigninDirs(1, "firefox", "", note)
+    root.fs.makeSigninDirs(1, "firefox", null, note)
+    var started = [
+      root.fs.exportCookies("chrome:/home/user/.config/chromium", 1, note),
+      root.fs.exportCookies("chrome+gnomekeyring", 1, note), root.fs.exportCookies("", 1, note),
+      root.fs.exportCookies("safari", 1, note), root.fs.exportCookies(["chrome"], 1, note),
+      root.fs.exportCookies("chrome", 0, note), root.fs.exportCookies("chrome", "1", note)
+    ]
+    h.equal(started, [0, 0, 0, 0, 0, 0, 0], "refusal: an export that is refused has no job to cancel")
+    asked += 9 + started.length
     root.fs.write(paths.runtimeDir + "/x.json", "x")
     h.waitFor(function() { return answers.length === asked }, 3000, function(all) {
       h.check(all, "refusal: every request is answered")
@@ -250,6 +295,155 @@ QtObject {
               h.check(jar.ok, "purge: an empty directory is fine")
               root.listing(paths.infoDir, function(left) {
                 h.equal(left, [], "purge: info")
+                root.next()
+              })
+            })
+          })
+        })
+      })
+    })
+  }
+
+  // ---- The files of signing in ----
+
+  // then(listing): "<mode> <path>" for everything below dir.
+  function tree(dir, then) {
+    root.lines(["/usr/bin/find", dir, "-mindepth", "1", "-printf", "%m %P\n"], function(found) {
+      then(found.sort())
+    })
+  }
+
+  function signInDirs() {
+    var h = root.h
+    var paths = root.fs.paths
+    var before = h.jobs().length
+    h.check(root.fs.jarPresent === false, "data: no login is assumed before anyone looked")
+    root.fs.prepareData(function(first) {
+      h.equal([first.ok, first.stdout, root.fs.jarPresent], [true, "ok\n", false], "data: prepared")
+      var wrapper = [h.tools.setpriv, "--pdeathsig", "TERM", h.tools.timeout, "-k", "2", "5"]
+      var command = [h.tools.sh, "-c", Sh.PREPARE_DATA, "omajuke-prepare-data", paths.dataDir, paths.jarFile]
+      h.equal(h.jobs()[before], { tag: "prepare-data", command: wrapper.concat(command) }, "data: command")
+      root.lines(["/usr/bin/stat", "-c", "%a", paths.dataDir], function(mode) {
+        h.equal(mode, ["700"], "data: the directory is private")
+        root.fs.makeSigninDirs(1, "firefox", "// preferences\n", function(made) {
+          h.check(made.ok, "attempt: made")
+          root.tree(paths.signinDir, function(found) {
+            h.equal(found, ["600 1/profile/user.js", "700 1", "700 1/config", "700 1/profile"],
+              "attempt: a private profile with its preferences, and an empty configuration directory")
+            var profile = Paths.signinAttemptDir(paths, 1) + "/profile"
+            h.equal(h.readFile(profile + "/user.js"), "// preferences\n", "attempt: the preferences text")
+            root.fs.makeSigninDirs(1, "chromium", "", function(again) {
+              h.equal([again.ok, again.exitCode], [false, 4], "attempt: never on a directory that is there")
+              root.fs.makeSigninDirs(2, "chromium", "ignored", function(second) {
+                h.check(second.ok, "attempt: a second one beside it")
+                root.tree(paths.signinDir + "/2", function(inside) {
+                  h.equal(inside, ["700 config", "700 profile"], "attempt: no preferences file for chromium")
+                  root.next()
+                })
+              })
+            })
+          })
+        })
+      })
+    })
+  }
+
+  function exportLogin() {
+    var h = root.h
+    var paths = root.fs.paths
+    var attempt = Paths.signinAttemptDir(paths, 1)
+    var before = h.jobs().length
+    var at = h.log("probe").length
+    var id = root.fs.exportCookies("chrome", 1, function(result) {
+      h.equal([result.ok, result.stdout, result.stderr], [true, "ok\n", ""], "export: one word")
+      var command = [
+        h.tools.setpriv, "--pdeathsig", "TERM", h.tools.timeout, "-k", "2", "60",
+        h.tools.sh, "-c", Sh.UMASK_EXEC, "omajuke",
+        h.tools.sh, "-c", Sh.COOKIE_EXPORT, "omajuke-export", "chrome", attempt + "/profile", attempt,
+        paths.jarFile, h.tools.ytdlp
+      ]
+      h.equal(h.jobs()[before], { tag: "cookie-export", command: command }, "export: one constant job")
+      h.check(JSON.stringify(h.jobs()).indexOf("invented") === -1, "export: no cookie in any command")
+      var record = h.log("probe")[at]
+      h.equal(record ? record.argv : null, [
+        "--ignore-config", "--no-plugin-dirs", "--no-cache-dir", "--no-remote-components",
+        "--cookies-from-browser", "chrome+basictext:" + attempt + "/profile",
+        "--cookies", attempt + "/export.txt"
+      ], "export: the tool reads the attempt's own profile, offline")
+      // The shell that runs the export adds three names of its own.
+      var given = (record ? record.env : []).filter(function(name) {
+        return ["PWD", "SHLVL", "_"].indexOf(name) === -1
+      })
+      h.equal(given, ["HOME", "LANG", "PATH", "TMPDIR", "XDG_RUNTIME_DIR"],
+        "export: the tool gets the local environment and a temporary directory inside the attempt")
+      root.listing(paths.dataDir, function(found) {
+        h.equal(found, ["600 cookies.txt"], "export: a private login file, and no temporary file")
+        var rows = h.readFile(paths.jarFile).split("\n")
+        h.equal(rows.slice(0, 2), ["# Netscape HTTP Cookie File", ""], "export: the file's own header")
+        var kept = rows.slice(2).filter(function(line) { return line !== "" })
+        h.equal(kept.map(function(line) { return line.split("\t")[0] + " " + line.split("\t")[5] }),
+          ["#HttpOnly_.youtube.com LOGIN_INFO", ".youtube.com SAPISID"], "export: YouTube's rows only")
+        root.tree(paths.signinDir, function(left) {
+          h.equal(left, ["700 2", "700 2/config", "700 2/profile"],
+            "export: the attempt's directory is gone, the other attempt is untouched")
+          root.fs.prepareData(function(second) {
+            h.equal([second.stdout, root.fs.jarPresent], ["jar\nok\n", true], "data: the login is found")
+            root.next()
+          })
+        })
+      })
+    })
+    h.check(id > 0, "export: the job's id is returned, to cancel it by")
+  }
+
+  function useLogin() {
+    var h = root.h
+    var paths = root.fs.paths
+    var copy = Paths.jarCopyFile(paths, 7)
+    var before = h.jobs().length
+    root.fs.copyJar(7, function(result) {
+      h.check(result.ok, "copy: made")
+      var command = [
+        h.tools.setpriv, "--pdeathsig", "TERM", h.tools.timeout, "-k", "2", "5",
+        h.tools.sh, "-c", Sh.UMASK_EXEC, "omajuke", h.tools.cp, "--", paths.jarFile, copy
+      ]
+      h.equal(h.jobs()[before], { tag: "jar-copy", command: command }, "copy: the command, under the umask")
+      root.listing(paths.jarDir, function(found) {
+        h.equal(found, ["600 7.txt"], "copy: named by counter, private")
+        h.check(h.readFile(copy) === h.readFile(paths.jarFile), "copy: the same rows")
+        root.fs.remove([copy], function(removed) {
+          h.check(removed.ok, "copy: removed after use")
+          root.listing(paths.jarDir, function(left) {
+            h.equal(left, [], "copy: gone")
+            root.next()
+          })
+        })
+      })
+    })
+  }
+
+  function forgetLogin() {
+    var h = root.h
+    var paths = root.fs.paths
+    var second = Paths.signinAttemptDir(paths, 2)
+    var before = h.jobs().length
+    root.fs.removeTree(second, function(result) {
+      h.check(result.ok, "tree: an attempt directory is removed whole")
+      var command = [
+        h.tools.setpriv, "--pdeathsig", "TERM", h.tools.timeout, "-k", "2", "5",
+        h.tools.rm, "-rf", "--", second
+      ]
+      h.equal(h.jobs()[before], { tag: "remove-tree", command: command }, "tree: the command")
+      root.fs.removeTree(second, function(again) {
+        h.check(again.ok, "tree: one that is already gone is no error")
+        root.tree(paths.signinDir, function(left) {
+          h.equal(left, [], "tree: nothing is left of any attempt")
+          root.fs.remove([paths.jarFile], function(removed) {
+            h.check(removed.ok, "sign out: the login is removed")
+            root.fs.prepareData(function(third) {
+              h.equal([third.stdout, root.fs.jarPresent], ["ok\n", false], "sign out: and no longer found")
+              root.listing(paths.dataDir, function(found) {
+                h.equal(found, [], "sign out: the data directory is empty")
                 root.next()
               })
             })

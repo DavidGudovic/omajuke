@@ -225,9 +225,18 @@ QtObject {
     h.equal([Env.net({ ok: false }), Env.mpv(null), Env.net(undefined)], [null, null, null],
       "no network profile without resolved paths")
     h.equal(Object.keys(Env.mpv(resolved)).sort(), [
-      "DBUS_SESSION_BUS_ADDRESS", "DENO_DIR", "DENO_NO_UPDATE_CHECK", "HOME", "LANG", "PATH",
-      "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR"
+      "DBUS_SESSION_BUS_ADDRESS", "DENO_DIR", "DENO_NO_UPDATE_CHECK", "GBM_BACKEND", "HOME", "LANG",
+      "LIBVA_DRIVER_NAME", "NVD_BACKEND", "PATH", "WAYLAND_DISPLAY", "XCURSOR_SIZE", "XCURSOR_THEME",
+      "XDG_RUNTIME_DIR", "__EGL_VENDOR_LIBRARY_FILENAMES", "__GLX_VENDOR_LIBRARY_NAME"
     ], "Env.mpv")
+    var attempt = "/run/user/1000/omajuke/signin/3"
+    h.equal(Object.keys(Env.browser(attempt)).sort(), [
+      "DBUS_SESSION_BUS_ADDRESS", "DISPLAY", "HOME", "LANG", "PATH", "WAYLAND_DISPLAY", "XDG_CONFIG_HOME",
+      "XDG_CURRENT_DESKTOP", "XDG_DATA_DIRS", "XDG_RUNTIME_DIR", "XDG_SESSION_TYPE"
+    ], "Env.browser")
+    h.equal([Env.browser(attempt).XDG_CONFIG_HOME, Env.browser(attempt + "/profile"), Env.browser(null),
+      Env.browser("/run/user/1000/omajuke/signin")], [attempt + "/config", null, null, null],
+      "Env.browser exists for a sign-in attempt directory only")
     h.equal(Object.keys(Env.hypr()).sort(),
       ["HOME", "HYPRLAND_INSTANCE_SIGNATURE", "LANG", "PATH", "XDG_RUNTIME_DIR"], "Env.hypr")
     var session = { http_proxy: null, https_proxy: "", all_proxy: null, ALL_PROXY: "socks5://127.0.0.1:9" }
@@ -245,6 +254,50 @@ QtObject {
       root.runner.run(root.spec("env", ["env"], { env: sparse }, function(narrow) {
         h.equal(narrow.stdout, "PATH\nQT_QPA_PLATFORM\nXDG_RUNTIME_DIR\n",
           "null passes one variable through, if it is set")
+        root.windowEnvironment()
+      }))
+    }))
+  }
+
+  // The launcher gives this case a cursor theme, as a session would. Only
+  // the player is handed it, and the sign-in browser gets a configuration
+  // directory of its own in place of the session's.
+  function windowEnvironment() {
+    var h = root.h
+    var resolved = { ok: true, denoDir: h.runDir + "/omajuke/deno" }
+    var attempt = h.runDir + "/omajuke/signin/3"
+    root.runner.run(root.spec("env", ["env"], { env: Env.mpv(resolved) }, function(player) {
+      h.equal(player.stdout.split("\n"),
+        ["DENO_DIR", "DENO_NO_UPDATE_CHECK", "HOME", "LANG", "PATH", "XCURSOR_THEME", "XDG_RUNTIME_DIR", ""],
+        "the player gets what the session says about a window, and nothing the session does not have")
+      root.runner.run(root.spec("env", ["env"], { env: Env.net(resolved) }, function(net) {
+        h.equal(net.stdout, "DENO_DIR\nDENO_NO_UPDATE_CHECK\nHOME\nLANG\nPATH\nXDG_RUNTIME_DIR\n",
+          "a network tool does not")
+        root.runner.run(root.spec("env", ["env"], { env: Env.browser(attempt) }, function(names) {
+          h.equal(names.stdout, "HOME\nLANG\nPATH\nXDG_CONFIG_HOME\nXDG_RUNTIME_DIR\n",
+            "the sign-in browser gets the session's own names and no cursor of ours")
+          var ask = ["value:XDG_CONFIG_HOME"]
+          root.runner.run(root.spec("env", ask, { env: Env.browser(attempt) }, function(config) {
+            h.equal(config.stdout, attempt + "/config\n",
+              "and its configuration directory is the attempt's, not the session's")
+            root.stubMemory()
+          }))
+        }))
+      }))
+    }))
+  }
+
+  // A stub that is started once per request keeps what it has to remember
+  // in a file of the run; a case can seed that file and read it back.
+  function stubMemory() {
+    var h = root.h
+    h.equal(h.stubState("probe"), null, "a stub that kept nothing has no state")
+    root.runner.run(root.spec("state", ["state:first"], {}, function(first) {
+      h.equal([first.stdout, h.stubState("probe")], ["[\"first\"]\n", ["first"]], "a stub keeps its state")
+      h.setStubState("probe", ["seeded"])
+      root.runner.run(root.spec("state", ["state:second"], {}, function(second) {
+        h.equal([second.stdout, h.stubState("probe")], ["[\"seeded\",\"second\"]\n", ["seeded", "second"]],
+          "and starts from the state a case gave it")
         root.next()
       }))
     }))

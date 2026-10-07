@@ -117,7 +117,8 @@ QtObject {
     return [player.mpvState, player.phase, player.currentKey, player.hasFile, player.duration]
   }
 
-  // Whether the player's one timer, the watchdog over a load, is running.
+  // Whether the watchdog over a load is running. The player has one other
+  // timer, a short one for asking mpv about its playlist.
   function watchdogRuns() {
     var parts = root.player.resources
     var timers = []
@@ -126,11 +127,12 @@ QtObject {
         timers.push(parts[i])
       }
     }
-    if (timers.length !== 1 || timers[0].interval !== Const.TIMEOUTS.loadMs) {
-      root.h.check(false, "the player has exactly one timer, the load watchdog")
+    var watchdogs = timers.filter(function(timer) { return timer.interval === Const.TIMEOUTS.loadMs })
+    if (timers.length !== 2 || watchdogs.length !== 1) {
+      root.h.check(false, "the player has two timers, and one of them is the load watchdog")
       return false
     }
-    return timers[0].running
+    return watchdogs[0].running
   }
 
   function atRest() {
@@ -174,7 +176,7 @@ QtObject {
     var h = root.h
     var lines = h.log("mpv")
     var file = root.fs.paths.infoDir + "/1.json"
-    h.equal(lines.slice(0, 10).map(function(line) { return line.command }), [
+    h.equal(lines.slice(0, 11).map(function(line) { return line.command }), [
       ["keybind", "CLOSE_WIN", "set vid no; script-message omajuke-video-closed"],
       ["observe_property", 1, "idle-active"],
       ["observe_property", 2, "pause"],
@@ -183,15 +185,16 @@ QtObject {
       ["observe_property", 5, "volume"],
       ["observe_property", 6, "mute"],
       ["observe_property", 8, "speed"],
+      ["observe_property", 14, "playlist"],
       ["set_property", "mute", false],
       ["loadfile", root.address, "replace", -1,
         { "force-media-title": root.title, "ytdl-raw-options-append": "load-info-json=" + file }]
     ], "the handshake, then the load that waited")
-    h.equal(lines.slice(0, 10).map(function(line) { return line.request_id }),
-      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "request ids count from 1")
+    h.equal(lines.slice(0, 11).map(function(line) { return line.request_id }),
+      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], "request ids count from 1")
     var odd = lines.filter(function(line) { return Object.keys(line).sort().join() !== "command,request_id" })
     h.equal(odd, [], "a line is a command and its request id, nothing else")
-    var rest = lines.slice(10).map(function(line) { return JSON.stringify(line.command) })
+    var rest = lines.slice(11).map(function(line) { return JSON.stringify(line.command) })
     h.check(rest.length >= 1, "the position is asked for when the track starts")
     h.equal(rest.filter(function(text) { return text !== "[\"get_property\",\"time-pos\"]" }), [],
       "and nothing else is sent")

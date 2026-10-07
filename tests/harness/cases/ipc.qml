@@ -22,11 +22,20 @@ QtObject {
   readonly property string asOption: "--no-config"
   readonly property string asMember: "constructor"
 
+  // Related tracks are another case's subject. Here the user has switched
+  // them off, so a queue ends where the user's own tracks end.
+  function setup(h, done) {
+    var entry = { id: h.manifest.id, autoplay: false }
+    h.shell.barConfig = { position: "top", layout: { left: [], center: [], right: [entry] } }
+    done()
+  }
+
   function run(h) {
     root.h = h
     h.scenario({ ytdlp: "ok", mpv: "ok", curl: "ok" })
     root.steps = [
-      root.withoutFacade, root.withFacade, root.hostileTargets, root.hostileQueries, root.nothingMoved,
+      root.withoutFacade, root.withFacade, root.hostileTargets, root.hostileQueries, root.hostileWords,
+      root.nothingMoved,
       root.idLikeAnOption, root.idLikeAMember, root.transport, root.enqueue, root.search, root.status,
       root.quiet
     ]
@@ -144,6 +153,31 @@ QtObject {
     root.next()
   }
 
+  // The two methods that take a word take their words and nothing else. A
+  // name of an output is only ever looked for in the list mpv gave, and
+  // while nothing plays there is no list.
+  function hostileWords() {
+    var h = root.h
+    var s = h.service
+    var common = [
+      undefined, null, 7, true, {}, [], "", " ", "constructor", "__proto__", "file:///etc/hostname", "--fs",
+      root.repeat("a", 5000)
+    ]
+    var actions = common.concat([["toggle"], "Toggle", "toggle ", " show", "hide\n", "show\u0000", "close"])
+    for (var i = 0; i < actions.length; i++) {
+      h.equal(s._ipcVideo(actions[i]), "invalid", "video, hostile argument " + i)
+    }
+    var names = common.concat([["next"], "Next", "next ", "auto\n", "pipewire/x\u0000", "pipewire/../../etc",
+      "alsa/default", "--audio-device=x", "auto", "pipewire/stub.one"])
+    for (var k = 0; k < names.length; k++) {
+      h.equal(s._ipcOutput(names[k]), "invalid", "output, hostile argument " + k)
+    }
+    h.equal([s._ipcVideo("toggle"), s._ipcVideo("show"), s._ipcVideo("hide"), s._ipcOutput("next")],
+      ["unhandled", "unhandled", "unhandled", "unhandled"],
+      "the words themselves: taken, and there is nothing to show, hide or step through")
+    root.next()
+  }
+
   function nothingMoved() {
     var h = root.h
     var s = h.service
@@ -152,7 +186,10 @@ QtObject {
         "hostile: playback did not move")
       h.equal([s.searchState, s.searchQuery, s.searchResults.length, s.searchError], ["idle", "", 0, ""],
         "hostile: the search did not move, and no text was kept")
-      h.equal(h.jobs().map(function(job) { return job.tag }), ["prepare"], "hostile: no job was started")
+      h.equal(h.jobs().map(function(job) { return job.tag }), ["prepare", "prepare-data"],
+        "hostile: no job was started")
+      h.equal([s.videoState, s.videoNote, s.outputs.length, h.log("hyprctl").length], ["hidden", "", 0, 0],
+        "hostile: no window, no output, and the compositor was not asked")
       h.equal([h.log("ytdlp").length, h.log("curl").length, h.log("mpv-start").length], [0, 0, 0],
         "hostile: no tool was started")
       h.equal(root.facadeCalls("summon").length, 1, "hostile: no refused search opened the panel")
@@ -232,19 +269,24 @@ QtObject {
     })
   }
 
-  // Until there is a queue, enqueue plays when nothing does and declines
-  // otherwise.
+  // A video goes to the end of the queue, and plays when nothing does.
   function enqueue() {
     var h = root.h
     var s = h.service
-    h.equal(s._ipcEnqueue(root.idA), "unhandled", "enqueue: declined while a track plays")
-    h.equal(s.currentTrack.id, root.asMember, "enqueue: the playing track is untouched")
+    h.equal(s._ipcEnqueue(root.idA), "ok", "enqueue: taken while a track plays")
+    h.equal([s.currentTrack.id, s.queueIndex, s.playbackState], [root.asMember, 0, "playing"],
+      "enqueue: the playing track is untouched")
+    h.equal(s.queue.map(function(item) { return [item.id, item.auto] }),
+      [[root.asMember, false], [root.idA, false]], "enqueue: at the end of the queue")
+    h.equal(s.queue[1].title, "", "enqueue: known by its id alone until it is looked up")
+    h.equal(JSON.parse(s._ipcStatus()).queueLength, 2, "enqueue: the status counts it")
     h.equal(s._ipcStop(), "ok", "stop: taken")
     h.equal(s._ipcStop(), "unhandled", "stop: nothing left to stop")
     root.until("stop: mpv is gone", root.mpvOff, 5000, function() {
-      h.equal(s._ipcEnqueue("https://youtu.be/" + root.idA), "ok", "enqueue: plays when nothing does")
+      h.equal(s._ipcEnqueue("https://youtu.be/" + root.idA), "ok", "enqueue: taken when nothing plays")
       root.until("enqueue: plays", root.state("playing"), 8000, function() {
-        h.equal(s.currentTrack.id, root.idA, "enqueue: the video of the link")
+        h.equal([s.currentTrack.id, s.queueIndex, s.queue.length], [root.idA, 2, 3],
+          "enqueue: the video of the link, at the end, and it plays")
         // Long enough for the player to remember a position after the stop.
         h.after(400, function() {
           h.check(JSON.parse(s._ipcStatus()).position > 0, "enqueue: the status has the position")
@@ -326,7 +368,7 @@ QtObject {
     s.manifest = { id: id, version: h.manifest.version }
     h.equal(s._ipcStatus(), JSON.stringify({
       version: h.manifest.version, state: "idle", id: "", title: "", channel: "", position: 0, duration: 0,
-      live: false, volume: 70, muted: false, queueLength: 1, queueIndex: -1, video: "hidden", output: "",
+      live: false, volume: 70, muted: false, queueLength: 3, queueIndex: -1, video: "hidden", output: "",
       signedIn: false, updatePending: false, error: ""
     }), "status: the whole answer, idle")
     root.next()

@@ -18,6 +18,14 @@ QtObject {
   readonly property string idB: "BBBBBBBBBBB"
   readonly property string idC: "CCCCCCCCCCC"
 
+  // Related tracks are another case's subject. Here the user has switched
+  // them off, so a queue ends where the user's own tracks end.
+  function setup(h, done) {
+    var entry = { id: h.manifest.id, autoplay: false }
+    h.shell.barConfig = { position: "top", layout: { left: [], center: [], right: [entry] } }
+    done()
+  }
+
   function run(h) {
     root.h = h
     h.scenario({ ytdlp: "ok", mpv: "ok", curl: "ok" })

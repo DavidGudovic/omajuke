@@ -1,12 +1,15 @@
 "use strict"
-// Shared helper of the stub tools (probe.js, mpv.js, yt-dlp.js, curl.js and
-// later ones). A stub stands in for a real program inside a harness run. It
-// sees only the scrubbed environment the plugin gave it and finds the run's
-// record directory, <XDG_RUNTIME_DIR>/oj-stub, through that environment.
+// Shared helper of the stub tools (probe.js, mpv.js, yt-dlp.js,
+// yt-dlp-account.js, curl.js, hyprctl.js, xdg-settings.js, browser.js). A
+// stub stands in for a real program inside a harness run. It sees only the
+// scrubbed environment the plugin gave it and finds the run's record
+// directory, <XDG_RUNTIME_DIR>/oj-stub, through that environment.
 //
 // For every stub this file owns: the PID record the launcher's leak check
-// reads, the log of what the stub was started with, and the scenario the
-// case wrote for it. It is required by the stubs and is not executable.
+// reads, the log of what the stub was started with, the scenario the case
+// wrote for it, and what a stub that is started once per request remembers
+// from one run to the next. It is required by the stubs and is not
+// executable.
 var fs = require("fs")
 var path = require("path")
 
@@ -103,6 +106,26 @@ function start(tool) {
     return commands
   }
 
+  // What this stub kept from its earlier runs (oj-stub/<tool>.state.json),
+  // or fallback when there is nothing yet. A case can read and seed the
+  // same file through the harness.
+  var stateFile = path.join(dir, tool + ".state.json")
+  function readState(fallback) {
+    try {
+      return JSON.parse(fs.readFileSync(stateFile, "utf8"))
+    } catch (error) {
+      return fallback === undefined ? null : fallback
+    }
+  }
+
+  // Written beside the file and renamed over it, so that a case which reads
+  // while the stub writes sees the old state or the new one, never half.
+  function writeState(state) {
+    var next = stateFile + "." + process.pid
+    fs.writeFileSync(next, JSON.stringify(state))
+    fs.renameSync(next, stateFile)
+  }
+
   return {
     tool: tool,
     dir: dir,
@@ -110,7 +133,9 @@ function start(tool) {
     recordStart: recordStart,
     scenario: scenario,
     scenarios: scenarios,
-    takeInjected: takeInjected
+    takeInjected: takeInjected,
+    readState: readState,
+    writeState: writeState
   }
 }
 

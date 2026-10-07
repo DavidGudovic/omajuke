@@ -1,17 +1,24 @@
 #!/usr/bin/node
 "use strict"
 // Stands in for curl inside a harness run. Like the real tool with
-// "--config -" it reads its transfers from standard input, as pairs of
-// lines (url = "...", output = "..."), "downloads" each one by copying the
-// thumbnail fixture to the output file, and prints one line per transfer in
-// the format "--write-out" asks for. No network is involved.
+// "--config -" it reads what to fetch from standard input. No network is
+// involved. It serves the two requests the plugin makes, told apart by what
+// the configuration holds:
+//
+//   thumbnails   pairs of lines (url = "...", output = "..."). Each one is
+//                "downloaded" by copying the thumbnail fixture to the output
+//                file, and one line per transfer is printed in the format
+//                "--write-out" asks for.
+//   segments     one line (url = "...") that names the segment service and
+//                no output file: the answer goes to standard output,
+//                followed by what "--write-out" asks for.
 //
 // Files are created with default permissions, so that their mode shows
 // whether the plugin ran this tool under a private umask.
 //
 // Every start is recorded through lib.js (arguments, standard input, names
 // of the environment variables). The scenario the case wrote under "curl"
-// chooses how the transfers end:
+// chooses how thumbnail transfers end:
 //
 //   ok             every transfer succeeds (the default)
 //   slow:<ms>      the same, after that many milliseconds
@@ -26,6 +33,28 @@
 //   loud           does not end when asked to either, and prints far more
 //                  than a report may hold
 //   hang           nothing happens; waits until it is ended
+//
+// The scenario under "sponsor" chooses how a segment lookup ends:
+//
+//   ok             HTTP 200 and a list of segments (the default). The list
+//                  is what the case stored as "sponsor" in this stub's
+//                  state, h.setStubState("curl", { sponsor: [...] }), in
+//                  the service's own format: [{ videoID, segments: [{
+//                  category, actionType, segment: [start, end],
+//                  videoDuration }] }]. Without stored state it is the
+//                  list below: one stretch of the video fixture, and one
+//                  of another video that shares the looked-up prefix.
+//   slow:<ms>      the same, after that many milliseconds
+//   none           HTTP 404 "Not Found": nothing is known about the prefix
+//   empty          HTTP 200 and an empty list
+//   error          HTTP 500 and a line of text
+//   garbage        HTTP 200 and a web page instead of JSON
+//   non-ascii      HTTP 200 and JSON with a character outside ASCII
+//   big            HTTP 200 and more bytes than an answer may have
+//   hang           no answer; waits until it is ended
+//
+// A lookup whose address does not name a four-digit hexadecimal prefix is
+// answered with HTTP 400, as the service does.
 var fs = require("fs")
 var path = require("path")
 var lib = require("./lib.js")
@@ -38,6 +67,32 @@ var EXIT_USAGE = 2
 var EXIT_HTTP = 22
 var EXIT_PARTIAL = 18
 
+// The segment service, and the part of its address that carries the prefix.
+var SEGMENTS = /^https:\/\/sponsor\.ajay\.app\/api\/skipSegments\/([^?\/]*)(\?.*)?$/
+var PREFIX = /^[0-9a-f]{4}$/
+// More than an answer may have.
+var BIG_BYTES = 1048576 + 4096
+
+// What the service knows by default: a sponsor message from second 1 to 3
+// of the five-second video fixture, and a stretch of some other video whose
+// hash starts the same way. The second must never be acted on.
+var KNOWN = [
+  {
+    videoID: "AAAAAAAAAAA",
+    segments: [
+      { category: "sponsor", actionType: "skip", segment: [1, 3], UUID: "synthetic-1", videoDuration: 5,
+        locked: 0, votes: 4, description: "" }
+    ]
+  },
+  {
+    videoID: "ZZZZZZZZZZZ",
+    segments: [
+      { category: "sponsor", actionType: "skip", segment: [0, 4], UUID: "synthetic-2", videoDuration: 5,
+        locked: 0, votes: 1, description: "" }
+    ]
+  }
+]
+
 var stub = lib.start("curl")
 var scenario = stub.scenario()
 var argv = process.argv.slice(2)
@@ -49,7 +104,8 @@ function valueOf(flag) {
 }
 
 // The transfers in a configuration text: [{ url, output }], or null when a
-// line is not one of the two this stub understands.
+// line is not one of the two this stub understands. output is null for a
+// transfer that names no file.
 function transfers(text) {
   var found = []
   var lines = text.split("\n")
@@ -62,7 +118,60 @@ function transfers(text) {
     else if (latest !== null && latest.output === null) latest.output = pair[2]
     else return null
   }
-  return found.every(function(transfer) { return transfer.output !== null }) ? found : null
+  return found
+}
+
+// True when every transfer names the file it goes to.
+function allToFiles(items) {
+  return items.every(function(item) { return item.output !== null })
+}
+
+// The scenario of a segment lookup as { name, arg }.
+function sponsorScenario() {
+  var all = stub.scenarios()
+  var value = Object.prototype.hasOwnProperty.call(all, "sponsor") ? String(all.sponsor) : "ok"
+  var cut = value.indexOf(":")
+  return cut === -1 ? { name: value, arg: "" } : { name: value.slice(0, cut), arg: value.slice(cut + 1) }
+}
+
+// The list of segments an "ok" lookup is answered with.
+function knownSegments() {
+  var state = stub.readState(null)
+  var stored = state !== null && typeof state === "object" ? state.sponsor : undefined
+  return JSON.stringify(stored === undefined ? KNOWN : stored)
+}
+
+// Prints the answer of a segment lookup and what the command line asked to
+// have written behind it, then ends. Without --fail an HTTP error is not an
+// error of the tool: it ends with 0 all the same.
+function answerSegments(code, body) {
+  var format = valueOf("--write-out")
+  var tail = format === null ? "" : report(format, 0, { code: code, exit: 0, size: body.length, type: "" })
+  process.stdout.write(body + tail, function() { process.exit(0) })
+}
+
+function lookUpSegments(item) {
+  var kind = sponsorScenario()
+  var address = SEGMENTS.exec(item.url)
+  if (address === null) {
+    process.stderr.write("curl: the stub does not know that address\n")
+    process.exit(EXIT_USAGE)
+  }
+  if (!PREFIX.test(address[1])) {
+    answerSegments(400, "Hash prefix does not match format requirements.")
+    return
+  }
+  if (kind.name === "hang") setInterval(function() {}, 60000)
+  else if (kind.name === "slow") {
+    setTimeout(function() { answerSegments(200, knownSegments()) }, Number(kind.arg) || 0)
+  } else if (kind.name === "none") answerSegments(404, "Not Found")
+  else if (kind.name === "empty") answerSegments(200, "[]")
+  else if (kind.name === "error") answerSegments(500, "Internal Server Error")
+  else if (kind.name === "garbage") answerSegments(200, "<html><body>not what was asked for</body></html>")
+  else if (kind.name === "non-ascii") {
+    answerSegments(200, JSON.stringify([{ videoID: "AAAAAAAAAAA", segments: [], note: "caf\u00e9" }]))
+  } else if (kind.name === "big") answerSegments(200, "[" + " ".repeat(BIG_BYTES) + "]")
+  else answerSegments(200, knownSegments())
 }
 
 // Positions named in the scenario's argument; an empty argument means all.
@@ -118,11 +227,13 @@ function run(items) {
 lib.readStdin(function(text) {
   stub.recordStart(text)
   var items = valueOf("--config") === "-" ? transfers(text) : null
-  if (items === null) {
+  var segments = items !== null && items.length === 1 && items[0].output === null
+  if (items === null || (!segments && !allToFiles(items))) {
     process.stderr.write("curl: the stub could not read its configuration\n")
     process.exit(EXIT_USAGE)
   }
-  if (scenario.name === "hang") setInterval(function() {}, 60000)
+  if (segments) lookUpSegments(items[0])
+  else if (scenario.name === "hang") setInterval(function() {}, 60000)
   else if (scenario.name === "slow") setTimeout(function() { run(items) }, Number(scenario.arg) || 0)
   else if (scenario.name === "stubborn") {
     process.on("SIGTERM", function() {})

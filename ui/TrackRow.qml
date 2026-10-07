@@ -3,10 +3,12 @@ import qs.Commons
 import qs.Ui
 import "Ui.js" as Ui
 
-// One track in a list: thumbnail, title, channel, and the length or a LIVE
-// mark at the right edge. The row draws no hover state of its own: the page
-// decides which row carries the cursor, from the keyboard and from the
-// pointer alike, so there is one highlight on screen at a time.
+// One track in a list: thumbnail, title, channel, the length or a LIVE mark,
+// and at the right edge an optional small button for the one thing a list
+// offers beside playing the row (add it to the queue, remove it from the
+// queue). The row draws no hover state of its own: the page decides which
+// row carries the cursor, from the keyboard and from the pointer alike, so
+// there is one highlight on screen at a time.
 CursorSurface {
   id: root
 
@@ -18,6 +20,10 @@ CursorSurface {
   property color urgent: Color.urgent
   // This is the track that is playing.
   property bool isCurrent: false
+  // The glyph and the tooltip of the button at the right edge. Without a
+  // glyph there is no button.
+  property string actionIcon: ""
+  property string actionTip: ""
 
   readonly property string title: track && typeof track.title === "string" ? track.title : ""
   readonly property string channel: track && typeof track.channel === "string" ? track.channel : ""
@@ -29,6 +35,8 @@ CursorSurface {
   // tell a real movement from a row that slid under a resting pointer.
   signal pointerMoved(var mouse)
   signal thumbFailed()
+  // The button at the right edge was clicked.
+  signal actionClicked()
 
   implicitHeight: Style.space(46)
   current: root.isCurrent
@@ -79,7 +87,7 @@ CursorSurface {
 
   Item {
     id: trailing
-    anchors.right: parent.right
+    anchors.right: actionButton.visible ? actionButton.left : parent.right
     anchors.rightMargin: Style.space(6)
     anchors.verticalCenter: parent.verticalCenter
     width: root.live ? liveChip.width : runtimeText.implicitWidth
@@ -123,5 +131,21 @@ CursorSurface {
     cursorShape: Qt.PointingHandCursor
     onPositionChanged: function(mouse) { root.pointerMoved(mouse) }
     onClicked: root.activated()
+  }
+
+  // After the mouse area, so that it lies on top and a click on it is not
+  // a click on the row.
+  PanelActionButton {
+    id: actionButton
+    anchors.right: parent.right
+    anchors.rightMargin: Style.space(6)
+    anchors.verticalCenter: parent.verticalCenter
+    visible: root.actionIcon !== ""
+    iconText: root.actionIcon
+    tooltipText: root.actionTip
+    foreground: Qt.darker(root.fg, 1.5)
+    hoverColor: root.fg
+    fontFamily: root.fontFamily
+    onClicked: root.actionClicked()
   }
 }

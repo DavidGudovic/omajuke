@@ -499,6 +499,24 @@ function auditIdentity(tree, constants) {
     if ("defaults" in barWidget || "schema" in barWidget) unread.push("barWidget.defaults or schema")
     unread.forEach(function(key) { problems.push("manifest.json: " + key + " is read by nothing") })
   }
+  // The newest entry of the changelog is the version that is published.
+  var changelog = find(tree, "CHANGELOG.md")
+  if (changelog !== null) {
+    var newest = /^## +(\S+)/m.exec(changelog.text)
+    if (!newest || newest[1] !== constants.version) {
+      problems.push("CHANGELOG.md: the newest entry is not version " + constants.version)
+    }
+  }
+  // The README says which version it describes, and shows the version in
+  // an example answer.
+  var readme = find(tree, "README.md")
+  if (readme !== null) {
+    var named = /\bThis is version (\d+\.\d+\.\d+)|"version":\s*"([^"\n]*)"/g
+    matches(named, readme.text).forEach(function(found) {
+      var written = found.groups[1] !== undefined ? found.groups[1] : found.groups[2]
+      if (written !== constants.version) problems.push(at(readme, found.index) + ": names another version")
+    })
+  }
   // The id is spelled in the manifest, in Const.js and in the README. The
   // widget and the panel get it from the host.
   var spelled = ["manifest.json", "lib/Const.js", "README.md"]
@@ -533,7 +551,7 @@ var LAYOUT = {
     "tests/harness/cases/prepare.qml", "tests/harness/cases/fs_write.qml",
     "tests/harness/cases/state_roundtrip.qml", "tests/harness/cases/state_corrupt.qml",
     "tests/harness/cases/state_no_history.qml", "tests/harness/cases/settings.qml",
-    "tests/harness/cases/settings_latch.qml"
+    "tests/harness/cases/settings_latch.qml", "tests/node/export.test.js"
   ],
   "player": [
     "lib/MpvArgs.js", "lib/MpvProto.js", "lib/PlayerState.js", "core/MpvProcess.qml", "core/MpvSocket.qml",
@@ -544,7 +562,8 @@ var LAYOUT = {
     "tests/harness/cases/player_transport.qml", "tests/harness/cases/player_missing.qml",
     "tests/harness/cases/player_no_socket.qml", "tests/harness/cases/player_exit.qml",
     "tests/harness/cases/player_external.qml", "tests/harness/cases/tether.qml",
-    "tests/harness/cases/tether_real.qml"
+    "tests/harness/cases/tether_real.qml", "tests/harness/cases/player_queue.qml",
+    "tests/harness/cases/player_video.qml", "tests/harness/cases/player_outputs.qml"
   ],
   "YouTube data": [
     "lib/YtArgs.js", "lib/Thumbs.js", "core/Search.qml", "core/Resolver.qml", "core/Thumbnails.qml",
@@ -553,7 +572,44 @@ var LAYOUT = {
     "tests/harness/cases/search_ok.qml", "tests/harness/cases/search_cancel.qml",
     "tests/harness/cases/search_errors.qml", "tests/harness/cases/resolve.qml",
     "tests/harness/cases/thumbs_ok.qml", "tests/harness/cases/thumbs_404.qml",
-    "tests/harness/cases/thumbs_evict.qml"
+    "tests/harness/cases/thumbs_evict.qml", "tests/fixtures/mix.json", "tests/harness/cases/search_mix.qml",
+    "tests/harness/cases/preload.qml", "tests/harness/cases/expiry.qml"
+  ],
+  "queue": [
+    "lib/Queue.js", "tests/node/queue.test.js", "tests/vectors/queue.js",
+    "tests/harness/cases/vectors_queue.qml", "tests/harness/cases/queue_order.qml",
+    "tests/harness/cases/queue_follow_mpv.qml", "tests/harness/cases/queue_stop_class.qml",
+    "tests/harness/cases/autoplay.qml", "tests/harness/cases/autoplay_fail_soft.qml"
+  ],
+  "video window": [
+    "core/HyprCtl.qml", "core/VideoWindow.qml", "lib/Lua.js", "lib/Geometry.js", "tests/stubs/hyprctl.js",
+    "tests/node/lua.test.js", "tests/node/geometry.test.js", "tests/vectors/lua.js",
+    "tests/vectors/geometry.js", "tests/harness/VideoParts.qml", "tests/harness/cases/vectors_hypr.qml",
+    "tests/harness/cases/hypr_gate.qml", "tests/harness/cases/hypr_none.qml",
+    "tests/harness/cases/video_show_hide.qml", "tests/harness/cases/video_track_change.qml",
+    "tests/harness/cases/video_closed.qml", "tests/harness/cases/video_remember.qml"
+  ],
+  "shortcuts": [
+    "core/Shortcuts.qml", "lib/KeyCombo.js", "tests/gen-binds.js", "tests/fixtures/binds.txt",
+    "tests/node/keycombo.test.js", "tests/vectors/keycombo.js", "tests/harness/ShortcutParts.qml",
+    "tests/harness/cases/vectors_keycombo.qml", "tests/harness/cases/shortcuts.qml",
+    "tests/harness/cases/shortcuts_reload.qml", "tests/harness/cases/shortcuts_teardown.qml",
+    "tests/harness/cases/shortcuts_empty.qml", "tests/harness/cases/shortcuts_change.qml"
+  ],
+  "audio output and sponsor segments": [
+    "core/AudioOutputs.qml", "core/Sponsor.qml", "lib/Devices.js", "lib/Sha256.js", "lib/Segments.js",
+    "tests/node/devices.test.js", "tests/node/sha256.test.js", "tests/node/segments.test.js",
+    "tests/vectors/devices.js", "tests/vectors/sha256.js", "tests/vectors/segments.js",
+    "tests/harness/cases/vectors_devices.qml", "tests/harness/cases/outputs.qml",
+    "tests/harness/cases/vectors_sponsor.qml", "tests/harness/cases/sponsor.qml"
+  ],
+  "sign-in and feeds": [
+    "core/SignIn.qml", "core/Feeds.qml", "lib/Browsers.js", "lib/FeedUrls.js",
+    "tests/stubs/xdg-settings.js", "tests/stubs/browser.js", "tests/stubs/yt-dlp-account.js",
+    "tests/node/browsers.test.js", "tests/node/feeds.test.js", "tests/vectors/browsers.js",
+    "tests/vectors/feedurls.js", "tests/harness/cases/vectors_signin.qml",
+    "tests/harness/cases/signin.qml", "tests/harness/cases/signout.qml", "tests/harness/cases/feeds.qml",
+    "tests/harness/cases/markwatched.qml"
   ],
   "bar widget and panel": [
     "BarWidget.qml", "Panel.qml", "ui/Ui.js", "ui/PanelBody.qml", "ui/MainPage.qml", "ui/TrackRow.qml",
@@ -563,7 +619,12 @@ var LAYOUT = {
     "tests/harness-ui/cases/vectors_ui.qml", "tests/harness-ui/cases/focus_open.qml",
     "tests/harness-ui/cases/keys_main.qml", "tests/harness-ui/cases/states.qml",
     "tests/harness-ui/cases/stale.qml", "tests/harness-ui/cases/bar_widget.qml",
-    "tests/harness-ui/cases/settings_page.qml", "tests/node/ui.test.js", "tests/vectors/ui.js"
+    "tests/harness-ui/cases/settings_page.qml", "tests/node/ui.test.js", "tests/vectors/ui.js",
+    "ui/QueuePage.qml", "ui/OutputsPage.qml", "ui/ChoiceRow.qml", "ui/ShortcutsPage.qml",
+    "ui/KeyCapture.qml", "ui/SignInPage.qml", "ui/FeedChips.qml",
+    "tests/harness-ui/cases/queue_page.qml", "tests/harness-ui/cases/video_output.qml",
+    "tests/harness-ui/cases/shortcuts_page.qml", "tests/harness-ui/cases/signin_page.qml",
+    "tests/harness-ui/cases/feeds_sponsor.qml", "tests/harness-ui/cases/account_retry.qml"
   ],
   "service and documents": [
     "Service.qml", "core/Playback.qml", "lib/Recover.js", "manifest.json", "README.md", "SECURITY.md",
@@ -574,7 +635,11 @@ var LAYOUT = {
     "tests/harness/cases/external_stop.qml", "tests/harness/cases/mpv_missing.qml",
     "tests/harness/cases/ipc.qml", "tests/harness/cases/ipc_cli.qml", "tests/harness/cases/idle.qml",
     "tests/harness/cases/state_restore.qml", "tests/harness/cases/teardown.qml",
-    "tests/harness/cases/teardown_no_history.qml", "tests/harness/cases/proxy_hold.qml"
+    "tests/harness/cases/teardown_no_history.qml", "tests/harness/cases/proxy_hold.qml",
+    "tests/harness/cases/svc_queue.qml", "tests/harness/cases/svc_video.qml",
+    "tests/harness/cases/svc_shortcuts.qml", "tests/harness/cases/svc_outputs.qml",
+    "tests/harness/cases/svc_account.qml", "tests/harness/cases/svc_sponsor.qml",
+    "tests/harness/cases/svc_gap.qml", "tests/harness/cases/svc_output_next.qml"
   ]
 }
 
@@ -1165,6 +1230,48 @@ function auditPrivateAccess(tree) {
   return problems
 }
 
+// A script module is one object for the whole engine. Qt's engine lets any
+// file that imports it replace what it exports and reach the names it keeps
+// to itself, and freezing does not protect an array there. The checks in
+// lib/ therefore hold only while no file of the plugin writes into a
+// module, changes one of its lists in place or uses a private name of it.
+var MUTATORS = ["push", "pop", "shift", "unshift", "splice", "sort", "reverse", "fill", "copyWithin"]
+
+// The names under which a file knows the scripts it imports.
+function moduleNames(entry) {
+  var names = pathImports(entry).filter(function(found) {
+    return /\.js$/.test(found.target) && found.qualifier !== ""
+  }).map(function(found) { return found.qualifier })
+  var scripted = /^\.import\s+"[^"\n]+"\s+as\s+([A-Za-z_]\w*)[ \t]*$/gm
+  matches(scripted, source(entry).plain).forEach(function(found) { names.push(found.groups[1]) })
+  return names
+}
+
+function auditModules(tree) {
+  var problems = []
+  tree.forEach(function(entry) {
+    if (!isPluginCode(entry.path)) return
+    var code = source(entry).code
+    moduleNames(entry).forEach(function(name) {
+      var member = "\\b" + name + "\\s*\\.\\s*[\\w$]+(?:\\s*\\.\\s*[\\w$]+|\\s*\\[[^\\]\\n]*\\])*"
+      var rules = [
+        [member + "\\s*(?:[-+*\\/%|&^]?=(?!=)|\\+\\+|--)", "writes into the module " + name],
+        ["(?:\\+\\+|--|\\bdelete\\s)\\s*\\b" + name + "\\s*\\.", "writes into the module " + name],
+        [member + "\\s*\\.\\s*(?:" + MUTATORS.join("|") + ")\\s*\\(", "changes a list of the module " + name],
+        ["\\b" + name + "\\s*\\.\\s*_", "uses a private name of the module " + name]
+      ]
+      rules.forEach(function(rule) {
+        matches(new RegExp(rule[0], "g"), code).forEach(function(found) {
+          // A member of something else that happens to carry the name.
+          if (/\.\s*$/.test(code.slice(0, found.index))) return
+          problems.push(at(entry, found.index) + ": " + rule[1])
+        })
+      })
+    })
+  })
+  return problems
+}
+
 // Members every Item already has. Declaring a property of that name is an
 // error; a function of that name silently replaces the built-in one.
 function auditMemberNames(tree) {
@@ -1236,6 +1343,69 @@ var REVIEWED_LOOKUPS = {
   },
   "lib/Track.js": {
     "object[key]": "read only behind hasOwnProperty.call, in the same expression"
+  },
+  "lib/Browsers.js": {
+    "table[rows[i][0]]": "writes the constant rows into a table that has no prototype",
+    "TABLE[id]": "read only behind hasOwnProperty.call, in the same expression"
+  },
+  "lib/Devices.js": {
+    "object[key]": "read only behind hasOwnProperty.call, in the same expression",
+    "seen[name]": "a table without a prototype, and the name has passed the device-name pattern",
+    "list[(index + 1) % list.length]": "a number: the position after the one indexOf found"
+  },
+  "lib/FeedUrls.js": {
+    "object[key]": "read only behind hasOwnProperty.call, in the same expression",
+    "_URLS[index]": "a number: what indexOf found in the constant list of kinds, checked against -1"
+  },
+  "lib/Geometry.js": {
+    "table[name]": "read only after hasOwnProperty.call said the table itself has the name"
+  },
+  "lib/KeyCombo.js": {
+    "_ROWS[which]": "a number: what indexOf found in the constant list of actions, checked against -1",
+    "_KEYS[at]": "a number: what indexOf found in the constant list of keys, checked against -1",
+    "values[slot]": "a number: what indexOf found in the constant list of fields, checked against -1"
+  },
+  "lib/Queue.js": {
+    "names[i]": "a loop counter into the list Object.keys made",
+    "queue[index]": "a number that was checked to be a position of the array",
+    "queue[i]": "a loop counter",
+    "view.copies[i]": "a loop counter",
+    "skipIds[skips - i]": "a loop counter, counted back from the length of the array",
+    "tracks[i]": "a loop counter",
+    "view.items[view.index]": "a number the view made, checked to be a position of its array",
+    "view.copies[at]": "a number out of the view's own Map of keys",
+    "view.items[at]": "a number out of the view's own Map of keys",
+    "items[i]": "a loop counter",
+    "entryKeys[i]": "a loop counter",
+    "keys[at - 1]": "a number: a position of the array, checked to be above 0",
+    "keys[at + 1]": "a number: a position of the array, checked to be below its length",
+    "keys[i]": "a loop counter"
+  },
+  "lib/Segments.js": {
+    "object[key]": "read only behind hasOwnProperty.call, in the same expression",
+    "sorted[i]": "a loop counter",
+    "merged[merged.length - 1]": "a number: the last position of an array that is not empty",
+    "_CATEGORIES_HIDDEN[rank]": "a number: what indexOf found in that very list, checked against -1",
+    "segments[i]": "a loop counter",
+    "videos[i]": "a loop counter",
+    "allowed[stretch.rank]": "a number: the rank indexOf gave the category when the stretch was read",
+    "fired[i]": "a loop counter",
+    "entries[i]": "a loop counter",
+    "marks[i]": "a loop counter"
+  },
+  "lib/Sha256.js": {
+    "block[at]": "a number: a position in the block the function was handed by its only caller",
+    "block[at + 1]": "as block[at]",
+    "block[at + 2]": "as block[at]",
+    "block[at + 3]": "as block[at]",
+    "words[i]": "a loop counter into an array the function made",
+    "words[i - 15]": "as words[i]",
+    "words[i - 2]": "as words[i]",
+    "words[i - 16]": "as words[i]",
+    "words[i - 7]": "as words[i]",
+    "_ROUNDS[i]": "a loop counter into the constant table",
+    "hash.block[hash.fill++]": "a number the hash counts itself",
+    "hash.value[i]": "a loop counter"
   }
 }
 
@@ -1591,6 +1761,7 @@ var AUDITS = [
   ["safety: the only addresses are https to the hosts we name", auditHosts],
   ["safety: the tool table and the panel source are set by tests only", auditSeams],
   ["safety: the view reads no private member of the service", auditPrivateAccess],
+  ["safety: no file writes into a script module or uses its private names", auditModules],
   ["safety: no component redeclares a member of Item", auditMemberNames],
   ["safety: every keyed lookup in lib/ has been reviewed", function(tree, isMiniature) {
     return auditLookups(tree, isMiniature ? SOUND_LOOKUPS : REVIEWED_LOOKUPS)
@@ -1836,7 +2007,13 @@ var PLANTED = {
     ["a manifest with another id", change("manifest.json", swap("example.plugin", "other.plugin"))],
     ["a manifest key nothing reads", change("manifest.json", swap("{\"id\"", "{\"$schema\":\"x\",\"id\""))],
     ["the id written into the widget",
-      change("BarWidget.qml", after("id: root", "  property string target: \"example.plugin\""))]
+      change("BarWidget.qml", after("id: root", "  property string target: \"example.plugin\""))],
+    ["a changelog that ends at another version",
+      change("CHANGELOG.md", "# Changelog\n\n## 0.0.9 - 2026-01-01\n\nWords.\n")],
+    ["a changelog without an entry", change("CHANGELOG.md", "# Changelog\n\nNothing yet.\n")],
+    ["a README about another version", change("README.md", after("# Example", "This is version 0.0.9."))],
+    ["a README example with another version",
+      change("README.md", after("# Example", "`{ \"version\": \"0.0.9\", \"state\": \"idle\" }`"))]
   ],
   "layout: every file": [
     ["a file the layout does not name", change("notes.txt", "left behind\n")]
@@ -1972,6 +2149,24 @@ var PLANTED = {
   "safety: the view reads": [
     ["a private member read by the view",
       change("BarWidget.qml", after("id: root", "  readonly property var parts: service._parts"))]
+  ],
+  "safety: no file writes": [
+    ["a constant of a module replaced",
+      change("Service.qml", after("id: root", "  function widen() {\n    Const.PLUGIN_ID = \"other\"\n  }"))],
+    ["a member of a module's table replaced",
+      change("core/ProcessRunner.qml", after("id: root", "  function sh() {\n    Const.TOOLS.sh = 1\n  }"))],
+    ["a counter kept in a module",
+      change("Service.qml", after("id: root", "  function count() {\n    Const.TOOLS.used++\n  }"))],
+    ["a member of a module deleted",
+      change("Service.qml", after("id: root", "  function drop() {\n    delete Const.TOOLS\n  }"))],
+    ["a list of a module grown in place",
+      change("Service.qml", after("id: root", "  function more() {\n    Const.TOOLS.list.push(\"x\")\n  }"))],
+    ["a private name of a module read by a component",
+      change("Service.qml", after("id: root", "  readonly property int cap: Const._CAP"))],
+    ["a script that writes into the script it imports",
+      change("lib/Ids.js", after("// Ids.", "Const.TOOLS[\"sh\"] = \"sh\""))],
+    ["a private name of a module read by a script",
+      change("lib/Ids.js", after("// Ids.", "var _CAP = Const._CAP"))]
   ],
   "safety: no component": [
     ["a property called state", inCore("  property string state: \"idle\"")],

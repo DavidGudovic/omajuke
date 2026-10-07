@@ -5,7 +5,8 @@
 // line, how feed() cuts a stream into lines and what it drops, and what
 // parse() makes of the lines mpv can send, hostile ones included. The same
 // table runs under node and inside Qt's JavaScript engine, so both must
-// agree on every row. All ids and paths are synthetic.
+// agree on every row. All ids, paths, addresses and device names are
+// synthetic.
 
 var _ID = "AAAAAAAAAAA"
 var _URL = "https://www.youtube.com/watch?v=AAAAAAAAAAA"
@@ -46,6 +47,28 @@ var _CLOSE_WIN = ["keybind", "CLOSE_WIN", "set vid no; script-message omajuke-vi
 var _NORM_ON = ["af", "add", "@omajuke-norm:dynaudnorm=f=250:g=31:p=0.9"]
 var _NORM_OFF = ["af", "remove", "@omajuke-norm"]
 
+// A media address of the kind a video is added from, and the commands
+// built around it.
+var _VIDEO = "https://rr1---sn-abc123.googlevideo.com/videoplayback?expire=1&id=o-AAA&itag=399"
+var _VIDEO_ADD = ["video-add", _VIDEO, "auto"]
+var _REQUEST_SIZE = ["set_property", "stream-lavf-o", { "request_size": "10485760" }]
+
+// Audio outputs as mpv lists them: the default, two sinks, and what must
+// never be selectable.
+var _SPEAKERS = "pipewire/alsa_output.stub-speakers.stereo"
+var _HEADSET = "pipewire/bluez_output.00_11_22_33_44_55.1"
+var _OUTPUTS = [
+  { name: "auto", description: "Autoselect device" },
+  { name: _SPEAKERS, description: "Stub speakers" },
+  { name: _HEADSET, description: "Stub headset" }
+]
+
+// Tracks as mpv lists them: the file's own audio, a video that came with
+// the file, and a video that was added.
+var _AUDIO_TRACK = { id: 1, type: "audio", external: false, selected: true, codec: "opus" }
+var _OWN_VIDEO = { id: 1, type: "video", external: false, selected: false, codec: "h264" }
+var _ADDED_VIDEO = { id: 2, type: "video", external: true, selected: false, "external-filename": _VIDEO }
+
 // A copy of base with the members of changes laid over it. Only ever used on
 // the literals of this file.
 function _with(base, changes) {
@@ -84,6 +107,11 @@ function _line(command, id) {
   return JSON.stringify({ command: command, request_id: id }) + "\n"
 }
 
+// The same for a command mpv is asked not to wait for.
+function _asyncLine(command, id) {
+  return JSON.stringify({ command: command, request_id: id, async: true }) + "\n"
+}
+
 // A line as mpv would send it.
 function _text(value) {
   return JSON.stringify(value)
@@ -102,6 +130,103 @@ function _feed(lines, text, skipping, dropped) {
   return { lines: lines, pending: { text: text, skipping: skipping }, dropped: dropped }
 }
 
+// What the readers of property values make of what mpv may put under
+// "data". Listed apart, to keep the table below about commands and lines.
+var _READERS = [
+  // ---- playlistIds: one slot for each entry ----
+  { fn: "playlistIds", args: [[]], expect: [] },
+  { fn: "playlistIds", args: [[{ filename: _URL, current: true, playing: true, id: 3 }]], expect: [3] },
+  { fn: "playlistIds", args: [[{ filename: _URL, id: 4 }, { filename: _URL, id: 1 }, { id: 2 }]],
+    expect: [4, 1, 2] },
+  // An entry that cannot be read keeps its place.
+  { fn: "playlistIds", args: [[{ id: 4 }, { filename: _URL }, null, "x", { id: "2" }, { id: 0 }, { id: 2.5 },
+    { id: 7 }]], expect: [4, 0, 0, 0, 0, 0, 0, 7] },
+  { fn: "playlistIds", args: [[[5]]], expect: [0] },
+  { fn: "playlistIds", args: [{ 0: { id: 1 }, length: 1 }], expect: [] },
+  { fn: "playlistIds", args: [{ id: 1 }], expect: [] },
+  { fn: "playlistIds", args: ["[{\"id\":1}]"], expect: [] },
+  { fn: "playlistIds", args: [null], expect: [] },
+  { fn: "playlistIds", args: [false], expect: [] },
+  { fn: "playlistIds", args: [], expect: [] },
+
+  // ---- videoTracks: only video that was added from outside ----
+  { fn: "videoTracks", args: [[]], expect: [] },
+  { fn: "videoTracks", args: [[_AUDIO_TRACK]], expect: [] },
+  { fn: "videoTracks", args: [[_AUDIO_TRACK, _OWN_VIDEO]], expect: [] },
+  { fn: "videoTracks", args: [[_AUDIO_TRACK, _ADDED_VIDEO]], expect: [2] },
+  { fn: "videoTracks", args: [[_AUDIO_TRACK, _OWN_VIDEO, _ADDED_VIDEO, _with(_ADDED_VIDEO, { id: 3 })]],
+    expect: [2, 3] },
+  { fn: "videoTracks", args: [[_ADDED_VIDEO, _ADDED_VIDEO]], expect: [2] },
+  { fn: "videoTracks", args: [[_with(_ADDED_VIDEO, { type: "audio" })]], expect: [] },
+  { fn: "videoTracks", args: [[_with(_ADDED_VIDEO, { type: "sub" })]], expect: [] },
+  { fn: "videoTracks", args: [[_with(_ADDED_VIDEO, { external: "yes" })]], expect: [] },
+  { fn: "videoTracks", args: [[_with(_ADDED_VIDEO, { external: 1 })]], expect: [] },
+  { fn: "videoTracks", args: [[_with(_ADDED_VIDEO, { id: "2" })]], expect: [] },
+  { fn: "videoTracks", args: [[_with(_ADDED_VIDEO, { id: 0 })]], expect: [] },
+  { fn: "videoTracks", args: [[_with(_ADDED_VIDEO, { id: 10000 })]], expect: [] },
+  { fn: "videoTracks", args: [[{ type: "video", external: true }]], expect: [] },
+  { fn: "videoTracks", args: [[null, 7, "video", [_ADDED_VIDEO]]], expect: [] },
+  { fn: "videoTracks", args: [_ADDED_VIDEO], expect: [] },
+  { fn: "videoTracks", args: [null], expect: [] },
+  { fn: "videoTracks", args: [], expect: [] },
+
+  // ---- trackId: a track, or none ----
+  { fn: "trackId", args: [1], expect: 1 },
+  { fn: "trackId", args: [9999], expect: 9999 },
+  { fn: "trackId", args: [false], expect: 0 },
+  { fn: "trackId", args: ["no"], expect: 0 },
+  { fn: "trackId", args: ["auto"], expect: 0 },
+  { fn: "trackId", args: ["1"], expect: 0 },
+  { fn: "trackId", args: [true], expect: 0 },
+  { fn: "trackId", args: [0], expect: 0 },
+  { fn: "trackId", args: [-1], expect: 0 },
+  { fn: "trackId", args: [1.5], expect: 0 },
+  { fn: "trackId", args: [10000], expect: 0 },
+  { fn: "trackId", args: [null], expect: 0 },
+  { fn: "trackId", args: [], expect: 0 },
+
+  // ---- hasPicture ----
+  { fn: "hasPicture", args: [{ pixelformat: "yuv420p", w: 1280, h: 720, aspect: 1.777778 }], expect: true },
+  { fn: "hasPicture", args: [{ w: 16, h: 16 }], expect: true },
+  { fn: "hasPicture", args: [{ w: 0, h: 720 }], expect: false },
+  { fn: "hasPicture", args: [{ w: 1280 }], expect: false },
+  { fn: "hasPicture", args: [{ w: "1280", h: "720" }], expect: false },
+  { fn: "hasPicture", args: [{}], expect: false },
+  { fn: "hasPicture", args: [[1280, 720]], expect: false },
+  { fn: "hasPicture", args: [true], expect: false },
+  { fn: "hasPicture", args: [null], expect: false },
+  { fn: "hasPicture", args: [], expect: false },
+
+  // ---- devices: what may be selected, with whatever it calls itself ----
+  { fn: "devices", args: [_OUTPUTS], expect: _OUTPUTS },
+  { fn: "devices", args: [[]], expect: [] },
+  { fn: "devices", args: [[{ name: "auto" }]], expect: [{ name: "auto", description: "" }] },
+  { fn: "devices", args: [[{ name: _SPEAKERS, description: 7 }]],
+    expect: [{ name: _SPEAKERS, description: "" }] },
+  { fn: "devices", args: [[{ name: _SPEAKERS, description: "A <b>name</b>\nof its own", volume: 3 }]],
+    expect: [{ name: _SPEAKERS, description: "A <b>name</b>\nof its own" }] },
+  { fn: "devices", args: [[{ name: "alsa/default", description: "Default" }, { name: "null" },
+    { name: "pulse/x", description: "x" }, { name: "pipewire/a b", description: "x" },
+    { name: _HEADSET, description: "Stub headset" }]],
+    expect: [{ name: _HEADSET, description: "Stub headset" }] },
+  { fn: "devices", args: [[null, "auto", ["auto"], { description: "nameless" }, { name: 7 }]], expect: [] },
+  { fn: "devices", args: [{ name: "auto" }], expect: [] },
+  { fn: "devices", args: ["auto"], expect: [] },
+  { fn: "devices", args: [null], expect: [] },
+  { fn: "devices", args: [], expect: [] },
+
+  // ---- deviceName ----
+  { fn: "deviceName", args: ["auto"], expect: "auto" },
+  { fn: "deviceName", args: [_SPEAKERS], expect: _SPEAKERS },
+  { fn: "deviceName", args: ["alsa/default"], expect: "" },
+  { fn: "deviceName", args: ["pipewire/a b"], expect: "" },
+  { fn: "deviceName", args: [""], expect: "" },
+  { fn: "deviceName", args: [["auto"]], expect: "" },
+  { fn: "deviceName", args: [7], expect: "" },
+  { fn: "deviceName", args: [null], expect: "" },
+  { fn: "deviceName", args: [], expect: "" }
+]
+
 var MODULE = "MpvProto"
 var CASES = [
   // ---- Builders without arguments ----
@@ -117,7 +242,8 @@ var CASES = [
     ["observe_property", 4, "duration"],
     ["observe_property", 5, "volume"],
     ["observe_property", 6, "mute"],
-    ["observe_property", 8, "speed"]
+    ["observe_property", 8, "speed"],
+    ["observe_property", 14, "playlist"]
   ] },
 
   // ---- observe, unobserve: only names from the table ----
@@ -127,6 +253,16 @@ var CASES = [
   { fn: "observe", args: ["speed"], expect: ["observe_property", 8, "speed"] },
   { fn: "unobserve", args: ["time-pos"], expect: ["unobserve_property", 7] },
   { fn: "unobserve", args: ["duration"], expect: ["unobserve_property", 4] },
+  { fn: "observe", args: ["vid"], expect: ["observe_property", 9, "vid"] },
+  { fn: "observe", args: ["track-list"], expect: ["observe_property", 10, "track-list"] },
+  { fn: "observe", args: ["video-params"], expect: ["observe_property", 11, "video-params"] },
+  { fn: "observe", args: ["audio-device-list"], expect: ["observe_property", 12, "audio-device-list"] },
+  { fn: "observe", args: ["audio-device"], expect: ["observe_property", 13, "audio-device"] },
+  { fn: "observe", args: ["playlist"], expect: ["observe_property", 14, "playlist"] },
+  { fn: "unobserve", args: ["video-params"], expect: ["unobserve_property", 11] },
+  { fn: "unobserve", args: ["audio-device-list"], expect: ["unobserve_property", 12] },
+  { fn: "observe", args: ["playlist-path"], expect: null },
+  { fn: "observe", args: ["audio-params"], expect: null },
   { fn: "observe", args: ["user-data/mpv/ytdl/json-subprocess-result"], expect: null },
   { fn: "observe", args: ["user-data/mpv/ytdl/path"], expect: null },
   { fn: "observe", args: ["path"], expect: null },
@@ -311,7 +447,150 @@ var CASES = [
   { fn: "getProperty", args: [["time-pos"]], expect: null },
   { fn: "getProperty", args: [], expect: null },
 
+  // ---- The playlist: a position inside it, or nothing ----
+  { fn: "playlistRemove", args: [0, 1], expect: ["playlist-remove", 0] },
+  { fn: "playlistRemove", args: [2, 3], expect: ["playlist-remove", 2] },
+  { fn: "playlistRemove", args: [199, 200], expect: ["playlist-remove", 199] },
+  { fn: "playlistRemove", args: [3, 3], expect: null },
+  { fn: "playlistRemove", args: [0, 0], expect: null },
+  { fn: "playlistRemove", args: [-1, 3], expect: null },
+  { fn: "playlistRemove", args: [1.5, 3], expect: null },
+  { fn: "playlistRemove", args: ["1", 3], expect: null },
+  { fn: "playlistRemove", args: ["current", 3], expect: null },
+  { fn: "playlistRemove", args: [NaN, 3], expect: null },
+  { fn: "playlistRemove", args: [200, 201], expect: null },
+  { fn: "playlistRemove", args: [1], expect: null },
+  { fn: "playlistRemove", args: [1, "3"], expect: null },
+  { fn: "playlistRemove", args: [], expect: null },
+
+  // ---- Video: a media address, a known track, a yes or a no ----
+  { fn: "streamRequestSize", args: [], expect: _REQUEST_SIZE },
+  { fn: "videoAdd", args: [_VIDEO], expect: _VIDEO_ADD },
+  { fn: "videoAdd", args: ["https://a.googlevideo.com/v"],
+    expect: ["video-add", "https://a.googlevideo.com/v", "auto"] },
+  { fn: "videoAdd", args: ["http://rr1---sn-abc123.googlevideo.com/videoplayback"], expect: null },
+  { fn: "videoAdd", args: ["https://googlevideo.com/videoplayback"], expect: null },
+  { fn: "videoAdd", args: ["https://rr1.googlevideo.com.example/videoplayback"], expect: null },
+  { fn: "videoAdd", args: ["https://example.com/?x=.googlevideo.com/"], expect: null },
+  { fn: "videoAdd", args: ["https://user@rr1.googlevideo.com/v"], expect: null },
+  { fn: "videoAdd", args: ["https://rr1.googlevideo.com:8443/v"], expect: null },
+  { fn: "videoAdd", args: ["https://rr1.googlevideo.com/v w"], expect: null },
+  { fn: "videoAdd", args: ["https://rr1.googlevideo.com/v\nquit"], expect: null },
+  { fn: "videoAdd", args: ["https://rr1.googlevideo.com/"], expect: null },
+  { fn: "videoAdd", args: ["/srv/video.mkv"], expect: null },
+  { fn: "videoAdd", args: ["file:///srv/video.mkv"], expect: null },
+  { fn: "videoAdd", args: ["edl://" + _VIDEO], expect: null },
+  { fn: "videoAdd", args: ["memory://x"], expect: null },
+  { fn: "videoAdd", args: [_URL], expect: null },
+  { fn: "videoAdd", args: [""], expect: null },
+  { fn: "videoAdd", args: [[_VIDEO]], expect: null },
+  { fn: "videoAdd", args: [null], expect: null },
+  { fn: "videoAdd", args: [], expect: null },
+  { fn: "setVid", args: [0, []], expect: ["set_property", "vid", "no"] },
+  { fn: "setVid", args: ["no", []], expect: ["set_property", "vid", "no"] },
+  { fn: "setVid", args: [0], expect: ["set_property", "vid", "no"] },
+  { fn: "setVid", args: [1, [1]], expect: ["set_property", "vid", 1] },
+  { fn: "setVid", args: [2, [1, 2]], expect: ["set_property", "vid", 2] },
+  // mpv answers "success" to a track that does not exist.
+  { fn: "setVid", args: [7, [1]], expect: null },
+  { fn: "setVid", args: [1, []], expect: null },
+  { fn: "setVid", args: [1], expect: null },
+  { fn: "setVid", args: [1, "1"], expect: null },
+  { fn: "setVid", args: ["1", ["1"]], expect: null },
+  { fn: "setVid", args: ["auto", ["auto"]], expect: null },
+  { fn: "setVid", args: [1.5, [1.5]], expect: null },
+  { fn: "setVid", args: [-1, [-1]], expect: null },
+  { fn: "setVid", args: [10000, [10000]], expect: null },
+  { fn: "setVid", args: [false, []], expect: null },
+  { fn: "setVid", args: [null, []], expect: null },
+  { fn: "setVid", args: [], expect: null },
+  { fn: "setForceWindow", args: [true], expect: ["set_property", "force-window", "yes"] },
+  { fn: "setForceWindow", args: [false], expect: ["set_property", "force-window", "no"] },
+  { fn: "setForceWindow", args: ["immediate"], expect: null },
+  { fn: "setForceWindow", args: [1], expect: null },
+  { fn: "setForceWindow", args: [], expect: null },
+  { fn: "setStopScreensaver", args: [true], expect: ["set_property", "stop-screensaver", "yes"] },
+  { fn: "setStopScreensaver", args: [false], expect: ["set_property", "stop-screensaver", "no"] },
+  { fn: "setStopScreensaver", args: ["always"], expect: null },
+  { fn: "setStopScreensaver", args: [], expect: null },
+
+  // ---- The audio output: only a name mpv has listed ----
+  { fn: "setAudioDevice", args: ["auto", _OUTPUTS], expect: ["set_property", "audio-device", "auto"] },
+  { fn: "setAudioDevice", args: [_SPEAKERS, _OUTPUTS], expect: ["set_property", "audio-device", _SPEAKERS] },
+  { fn: "setAudioDevice", args: [_HEADSET, _OUTPUTS], expect: ["set_property", "audio-device", _HEADSET] },
+  { fn: "setAudioDevice", args: ["pipewire/other", _OUTPUTS], expect: null },
+  { fn: "setAudioDevice", args: [_SPEAKERS, []], expect: null },
+  { fn: "setAudioDevice", args: [_SPEAKERS], expect: null },
+  { fn: "setAudioDevice", args: [_SPEAKERS, [_SPEAKERS]], expect: null },
+  { fn: "setAudioDevice", args: [_SPEAKERS, _OUTPUTS[1]], expect: null },
+  { fn: "setAudioDevice", args: ["auto", []], expect: null },
+  // Listed, but not of a kind that may be selected.
+  { fn: "setAudioDevice", args: ["alsa/default", [{ name: "alsa/default" }]], expect: null },
+  { fn: "setAudioDevice", args: ["null", [{ name: "null" }]], expect: null },
+  { fn: "setAudioDevice", args: ["pipewire/a b", [{ name: "pipewire/a b" }]], expect: null },
+  { fn: "setAudioDevice", args: ["pipewire/a,b", [{ name: "pipewire/a,b" }]], expect: null },
+  { fn: "setAudioDevice", args: ["pipewire/", [{ name: "pipewire/" }]], expect: null },
+  { fn: "setAudioDevice", args: ["", [{ name: "" }]], expect: null },
+  { fn: "setAudioDevice", args: ["constructor", _OUTPUTS], expect: null },
+  { fn: "setAudioDevice", args: [7, _OUTPUTS], expect: null },
+  { fn: "setAudioDevice", args: [], expect: null },
+
   // ---- encode: what the builders make ----
+  { fn: "encode", args: [["playlist-remove", 2], 6], expect: _line(["playlist-remove", 2], 6) },
+  { fn: "encode", args: [_REQUEST_SIZE, 6], expect: _line(_REQUEST_SIZE, 6) },
+  { fn: "encode", args: [["set_property", "vid", 1], 6], expect: _line(["set_property", "vid", 1], 6) },
+  { fn: "encode", args: [["set_property", "vid", "no"], 6], expect: _line(["set_property", "vid", "no"], 6) },
+  { fn: "encode", args: [["set_property", "force-window", "yes"], 6],
+    expect: _line(["set_property", "force-window", "yes"], 6) },
+  { fn: "encode", args: [["set_property", "stop-screensaver", "no"], 6],
+    expect: _line(["set_property", "stop-screensaver", "no"], 6) },
+  { fn: "encode", args: [["set_property", "audio-device", _SPEAKERS], 6],
+    expect: _line(["set_property", "audio-device", _SPEAKERS], 6) },
+  // A video is added without making mpv wait for it, asked for or not.
+  { fn: "encode", args: [_VIDEO_ADD, 6], expect: _asyncLine(_VIDEO_ADD, 6) },
+  { fn: "encode", args: [_VIDEO_ADD, 6, false], expect: _asyncLine(_VIDEO_ADD, 6) },
+  { fn: "encode", args: [_VIDEO_ADD, 6, true], expect: _asyncLine(_VIDEO_ADD, 6) },
+  { fn: "encode", args: [["stop"], 6, true], expect: _asyncLine(["stop"], 6) },
+  // ---- encode: the new commands, bent ----
+  { fn: "encode", args: [["playlist-remove", -1], 1], expect: "" },
+  { fn: "encode", args: [["playlist-remove", 200], 1], expect: "" },
+  { fn: "encode", args: [["playlist-remove", "current"], 1], expect: "" },
+  { fn: "encode", args: [["playlist-remove"], 1], expect: "" },
+  { fn: "encode", args: [["playlist-remove", 1, 2], 1], expect: "" },
+  // No builder makes these two, so they are not written either.
+  { fn: "encode", args: [["playlist-play-index", 0], 6], expect: "" },
+  { fn: "encode", args: [["playlist-clear"], 6], expect: "" },
+  { fn: "encode", args: [["playlist-play-index", "none"], 1], expect: "" },
+  { fn: "encode", args: [["playlist-play-index", 1.5], 1], expect: "" },
+  { fn: "encode", args: [["playlist-clear", "x"], 1], expect: "" },
+  { fn: "encode", args: [["playlist-shuffle"], 1], expect: "" },
+  { fn: "encode", args: [["playlist-move", 0, 1], 1], expect: "" },
+  { fn: "encode", args: [["video-add", _VIDEO], 1], expect: "" },
+  { fn: "encode", args: [["video-add", _VIDEO, "select"], 1], expect: "" },
+  { fn: "encode", args: [["video-add", _VIDEO, "auto", "title"], 1], expect: "" },
+  { fn: "encode", args: [["video-add", "/srv/video.mkv", "auto"], 1], expect: "" },
+  { fn: "encode", args: [["video-add", [_VIDEO], "auto"], 1], expect: "" },
+  { fn: "encode", args: [["audio-add", _VIDEO, "auto"], 1], expect: "" },
+  { fn: "encode", args: [["sub-add", _VIDEO, "auto"], 1], expect: "" },
+  { fn: "encode", args: [["video-remove", 1], 1], expect: "" },
+  { fn: "encode", args: [["set_property", "vid", "auto"], 1], expect: "" },
+  { fn: "encode", args: [["set_property", "vid", 0], 1], expect: "" },
+  { fn: "encode", args: [["set_property", "vid", true], 1], expect: "" },
+  { fn: "encode", args: [["set_property", "aid", 1], 1], expect: "" },
+  { fn: "encode", args: [["set_property", "sid", 1], 1], expect: "" },
+  { fn: "encode", args: [["set_property", "force-window", "immediate"], 1], expect: "" },
+  { fn: "encode", args: [["set_property", "force-window", true], 1], expect: "" },
+  { fn: "encode", args: [["set_property", "stop-screensaver", "always"], 1], expect: "" },
+  { fn: "encode", args: [["set_property", "audio-device", "alsa/default"], 1], expect: "" },
+  { fn: "encode", args: [["set_property", "audio-device", "pipewire/a b"], 1], expect: "" },
+  { fn: "encode", args: [["set_property", "audio-device", ""], 1], expect: "" },
+  { fn: "encode", args: [["set_property", "stream-lavf-o", {}], 1], expect: "" },
+  { fn: "encode", args: [["set_property", "stream-lavf-o", { "request_size": "1" }], 1], expect: "" },
+  { fn: "encode", args: [["set_property", "stream-lavf-o", { "request_size": 10485760 }], 1], expect: "" },
+  { fn: "encode", args: [["set_property", "stream-lavf-o",
+    { "request_size": "10485760", "http_proxy": "http://proxy.invalid:3128" }], 1], expect: "" },
+  { fn: "encode", args: [["set_property", "stream-lavf-o", "request_size=10485760"], 1], expect: "" },
+  { fn: "encode", args: [["set_property", "demuxer-lavf-o", { "request_size": "10485760" }], 1], expect: "" },
   { fn: "encode", args: [["stop"], 1], expect: "{\"command\":[\"stop\"],\"request_id\":1}\n" },
   { fn: "encode", args: [["quit"], 2], expect: _line(["quit"], 2) },
   { fn: "encode", args: [["set_property", "pause", true], 3],
@@ -400,7 +679,9 @@ var CASES = [
   { fn: "encode", args: [["observe_property", "7", "time-pos"], 1], expect: "" },
   { fn: "encode", args: [["observe_property", 7, "time-pos", "x"], 1], expect: "" },
   { fn: "encode", args: [["observe_property", 7], 1], expect: "" },
-  { fn: "encode", args: [["unobserve_property", 9], 1], expect: "" },
+  { fn: "encode", args: [["unobserve_property", 14], 1], expect: _line(["unobserve_property", 14], 1) },
+  { fn: "encode", args: [["unobserve_property", 15], 1], expect: "" },
+  { fn: "encode", args: [["observe_property", 14, "vid"], 1], expect: "" },
   { fn: "encode", args: [["unobserve_property", "7"], 1], expect: "" },
   { fn: "encode", args: [["unobserve_property"], 1], expect: "" },
   { fn: "encode", args: [["get_property", "path"], 1], expect: "" },
@@ -690,7 +971,7 @@ var CASES = [
   { fn: "entryId", args: ["1"], expect: 0 },
   { fn: "entryId", args: [null], expect: 0 },
   { fn: "entryId", args: [], expect: 0 }
-]
+].concat(_READERS)
 
 if (typeof module !== "undefined") {
   module.exports = { MODULE: MODULE, CASES: CASES }

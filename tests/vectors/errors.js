@@ -1,7 +1,8 @@
 .pragma library
 
 // Input and expectation table for lib/Errors.js: which code a finished
-// yt-dlp job gets, and which codes mean "this track is the problem". The
+// yt-dlp job gets, which codes mean "this track is the problem", and when a
+// job that was given a login shows that the login no longer counts. The
 // error lines are the ones yt-dlp prints (collected from a real run and
 // from its source), with a synthetic id in place of the video's. The same
 // table runs under node and inside Qt's JavaScript engine.
@@ -24,6 +25,11 @@ function _exited(stderr) {
 // The same for the usual case: one error line about the video.
 function _said(message) {
   return _job("exit", "ERROR: [youtube] " + _ID + ": " + message + "\n")
+}
+
+// A job that finished with success, with this on stderr.
+function _done(stderr) {
+  return { ok: true, error: "", exitCode: 0, stdout: "{}\n", stderr: stderr, durationMs: 900 }
 }
 
 function _repeat(unit, count) {
@@ -246,6 +252,20 @@ var CASES = [
   { fn: "isSkipClass", args: ["E_LINK"], expect: false },
   { fn: "isSkipClass", args: ["N_PROXY"], expect: false },
   { fn: "isSkipClass", args: ["N_STATE_RESET"], expect: false },
+  { fn: "isSkipClass", args: ["N_NO_RELATED"], expect: false },
+  { fn: "isSkipClass", args: ["N_SKIPPED"], expect: false },
+  { fn: "isSkipClass", args: ["E_VIDEO_NONE"], expect: false },
+  { fn: "isSkipClass", args: ["E_HYPR_VERSION"], expect: false },
+  { fn: "isSkipClass", args: ["E_HYPR_ERRORS"], expect: false },
+  { fn: "isSkipClass", args: ["E_HYPR_EVAL"], expect: false },
+  { fn: "isSkipClass", args: ["E_HYPR_NONE"], expect: false },
+  { fn: "isSkipClass", args: ["N_OUTPUT_FALLBACK"], expect: false },
+  { fn: "isSkipClass", args: ["E_SIGNIN_BROWSER"], expect: false },
+  { fn: "isSkipClass", args: ["E_SIGNIN_CANCELLED"], expect: false },
+  { fn: "isSkipClass", args: ["E_SIGNIN_NONE"], expect: false },
+  { fn: "isSkipClass", args: ["E_SIGNED_OUT"], expect: false },
+  { fn: "isSkipClass", args: ["E_SIGNOUT_LEFT"], expect: false },
+  { fn: "isSkipClass", args: ["E_FEED"], expect: false },
 
   // ---- isSkipClass: anything that is not a code ----
   { fn: "isSkipClass", args: [""], expect: false },
@@ -262,7 +282,41 @@ var CASES = [
   { fn: "isSkipClass", args: [null], expect: false },
   { fn: "isSkipClass", args: [true], expect: false },
   { fn: "isSkipClass", args: [["E_PLAYBACK"]], expect: false },
-  { fn: "isSkipClass", args: [{ code: "E_PLAYBACK" }], expect: false }
+  { fn: "isSkipClass", args: [{ code: "E_PLAYBACK" }], expect: false },
+
+  // ---- fromSignedIn: the login is gone when yt-dlp says so on any line ----
+  { fn: "fromSignedIn", expect: "E_SIGNED_OUT",
+    args: [_done(_STDIN_NOTE + "WARNING: [youtube] The provided YouTube account cookies are no longer valid. "
+      + "They have likely been rotated in the browser as a security measure.\n")] },
+  { fn: "fromSignedIn", args: [_said("Sign in to confirm your age. This video may be inappropriate")],
+    expect: "E_SIGNED_OUT" },
+  { fn: "fromSignedIn", args: [_said("Sign in to confirm you're not a bot")], expect: "E_SIGNED_OUT" },
+  { fn: "fromSignedIn", expect: "E_SIGNED_OUT",
+    args: [_exited("ERROR: [youtube:tab] WL: This playlist is private; login required\n")] },
+  { fn: "fromSignedIn", args: [_exited("ERROR: [youtube:tab] The feed requires authentication\n")],
+    expect: "E_SIGNED_OUT" },
+  { fn: "fromSignedIn", args: [_done("warning: LOGIN REQUIRED\n")], expect: "E_SIGNED_OUT" },
+  { fn: "fromSignedIn", args: [_done("first line\nsecond line\nthe cookies are no longer valid\n")],
+    expect: "E_SIGNED_OUT" },
+  { fn: "fromSignedIn", args: [_job("timeout", "WARNING: login required\n")], expect: "E_SIGNED_OUT" },
+
+  // ---- fromSignedIn: anything else says nothing about the login ----
+  { fn: "fromSignedIn", args: [_done("")], expect: "" },
+  { fn: "fromSignedIn", args: [_done(_STDIN_NOTE)], expect: "" },
+  { fn: "fromSignedIn", args: [_done("WARNING: [youtube] Falling back to another player\n")], expect: "" },
+  { fn: "fromSignedIn", args: [_said("Private video")], expect: "" },
+  { fn: "fromSignedIn", args: [_said("Video unavailable")], expect: "" },
+  { fn: "fromSignedIn", args: [_job("timeout", "")], expect: "" },
+  { fn: "fromSignedIn", args: [_job("missing", "")], expect: "" },
+  { fn: "fromSignedIn", args: [_done("login\nrequired\n")], expect: "" },
+  { fn: "fromSignedIn", args: [{ ok: true, stdout: "login required", stderr: "" }], expect: "" },
+  { fn: "fromSignedIn", args: [{ ok: true, stderr: ["login required"] }], expect: "" },
+  { fn: "fromSignedIn", args: [{ ok: true, stderr: null }], expect: "" },
+  { fn: "fromSignedIn", args: [{}], expect: "" },
+  { fn: "fromSignedIn", args: [null], expect: "" },
+  { fn: "fromSignedIn", args: ["login required"], expect: "" },
+  { fn: "fromSignedIn", args: [], expect: "" },
+  { fn: "fromSignedIn", args: [_done(_repeat("Sign in to ", 4096))], expect: "" }
 ]
 
 if (typeof module !== "undefined") {

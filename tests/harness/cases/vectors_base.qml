@@ -95,7 +95,7 @@ QtObject {
       h.equal(Errors.TEXT[names[i]], undefined, "Errors.TEXT has no " + names[i])
       h.check(!Object.prototype.hasOwnProperty.call(Errors.TEXT, names[i]), "no own key " + names[i])
     }
-    h.equal(Object.keys(Errors.TEXT).length, 20, "Errors.TEXT holds the twenty codes of this version")
+    h.equal(Object.keys(Errors.TEXT).length, 34, "Errors.TEXT holds the thirty-four codes of this version")
     h.equal(Errors.TEXT.E_NETWORK, "No network", "a code finds its sentence")
     h.check(Object.isFrozen(Errors.TEXT), "Errors.TEXT is frozen")
     // In this engine a write to a frozen table is dropped without an error.

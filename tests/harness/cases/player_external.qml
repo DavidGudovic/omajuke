@@ -104,11 +104,14 @@ QtObject {
         timers.push(parts[i])
       }
     }
-    if (timers.length !== 1 || timers[0].interval !== Const.TIMEOUTS.loadMs) {
-      root.h.check(false, "the player has exactly one timer, the load watchdog")
+    // Beside the watchdog over a load there is a short timer for asking
+    // mpv about its playlist.
+    var watchdogs = timers.filter(function(timer) { return timer.interval === Const.TIMEOUTS.loadMs })
+    if (timers.length !== 2 || watchdogs.length !== 1) {
+      root.h.check(false, "the player has two timers, and one of them is the load watchdog")
       return false
     }
-    return timers[0].running
+    return watchdogs[0].running
   }
 
   // What a media controller's Stop does.

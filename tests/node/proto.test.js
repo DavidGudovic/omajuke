@@ -3,8 +3,9 @@
 // engine), and the properties a table cannot state: that nothing outside
 // the vocabulary can be encoded however a command is bent, that a title
 // stays data whatever it holds, that the line assembler never holds more
-// than its cap, and that the real mpv accepted every command of the
-// vocabulary when the traces were recorded.
+// than its cap, that the real mpv accepted every command of the vocabulary
+// when the traces were recorded, and that the readers of property values
+// make of the recorded values what mpv meant.
 var test = require("node:test")
 var assert = require("node:assert")
 var fs = require("fs")
@@ -21,6 +22,11 @@ var CAP = Const.LIMITS.mpvLineChars
 var ID = "AAAAAAAAAAA"
 var PATHS = Paths.resolve({ XDG_RUNTIME_DIR: "/run/user/1000", HOME: "/data/user" })
 var INFO = Paths.infoFile(PATHS, 7)
+var VIDEO = "https://rr1---sn-abc123.googlevideo.com/videoplayback?expire=1&id=o-AAA&itag=399"
+var SINK = "pipewire/alsa_output.stub-speakers.stereo"
+var OUTPUTS = [
+  { name: "auto", description: "Autoselect device" }, { name: SINK, description: "Stub speakers" }
+]
 
 var EVENT_KEYS = ["args", "data", "event", "file_error", "id", "kind", "name", "playlist_entry_id", "reason"]
 var REPLY_KEYS = ["data", "error", "kind", "request_id"]
@@ -42,7 +48,13 @@ function samples() {
     MpvProto.getProperty("audio-device-list"),
     loadCommand(), loadCommand({ mode: "append-play" }), loadCommand({ mode: "insert-at", index: 3 }),
     loadCommand({ startAt: 75 }), loadCommand({ startAt: 172800 }), loadCommand({ title: "" }),
-    loadCommand({ id: "--no-config", title: "A,vid=1 \"q\" %5%${path}" })
+    loadCommand({ id: "--no-config", title: "A,vid=1 \"q\" %5%${path}" }),
+    MpvProto.playlistRemove(0, 1), MpvProto.playlistRemove(2, 3),
+    MpvProto.streamRequestSize(), MpvProto.videoAdd(VIDEO),
+    MpvProto.setVid(0, []), MpvProto.setVid(1, [1]), MpvProto.setVid(2, [1, 2]),
+    MpvProto.setForceWindow(true), MpvProto.setForceWindow(false), MpvProto.setStopScreensaver(true),
+    MpvProto.setStopScreensaver(false), MpvProto.setAudioDevice("auto", OUTPUTS),
+    MpvProto.setAudioDevice(SINK, OUTPUTS)
   ]
   MpvProto.OBSERVE.forEach(function(entry) {
     list.push(MpvProto.observe(entry.name))
@@ -94,9 +106,11 @@ function received(trace) {
 
 test("exports exactly the documented names", function() {
   assert.deepStrictEqual(Object.keys(MpvProto).sort(), [
-    "OBSERVE", "VIDEO_CLOSED", "closeWindowBind", "encode", "entryId", "feed", "getProperty", "handshake",
-    "loadfile", "observe", "parse", "quit", "resetSpeed", "seek", "setEvenVolume", "setMute", "setPause",
-    "setVolume", "stop", "unobserve"
+    "OBSERVE", "VIDEO_CLOSED", "closeWindowBind", "deviceName", "devices", "encode", "entryId", "feed",
+    "getProperty", "handshake", "hasPicture", "loadfile", "observe", "parse", "playlistIds",
+    "playlistRemove", "quit", "resetSpeed", "seek", "setAudioDevice", "setEvenVolume",
+    "setForceWindow", "setMute", "setPause", "setStopScreensaver", "setVid", "setVolume", "stop",
+    "streamRequestSize", "trackId", "unobserve", "videoAdd", "videoTracks"
   ])
 })
 
@@ -125,8 +139,23 @@ test("the observation table holds exactly the properties this version watches", 
     { id: 5, name: "volume", handshake: true },
     { id: 6, name: "mute", handshake: true },
     { id: 7, name: "time-pos", handshake: false },
-    { id: 8, name: "speed", handshake: true }
+    { id: 8, name: "speed", handshake: true },
+    { id: 9, name: "vid", handshake: false },
+    { id: 10, name: "track-list", handshake: false },
+    { id: 11, name: "video-params", handshake: false },
+    { id: 12, name: "audio-device-list", handshake: false },
+    { id: 13, name: "audio-device", handshake: false },
+    { id: 14, name: "playlist", handshake: true }
   ])
+})
+
+test("the audio outputs are not asked about until somebody wants them", function() {
+  // To list them mpv turns to the sound server, and has been seen to wait
+  // for one that is not there without answering anything else.
+  var text = JSON.stringify(MpvProto.handshake())
+  assert.ok(text.indexOf("audio-device") === -1)
+  assert.ok(text.indexOf("\"vid\"") === -1 && text.indexOf("track-list") === -1)
+  assert.ok(text.indexOf("video-params") === -1)
 })
 
 test("nothing that carries resolved addresses or log lines can be observed or read", function() {
@@ -144,7 +173,7 @@ test("nothing that carries resolved addresses or log lines can be observed or re
   names.forEach(function(name) {
     assert.strictEqual(MpvProto.observe(name), null, name)
     assert.strictEqual(MpvProto.getProperty(name), null, name)
-    assert.strictEqual(MpvProto.encode(["observe_property", 9, name], 1), "", name)
+    assert.strictEqual(MpvProto.encode(["observe_property", 14, name], 1), "", name)
     assert.strictEqual(MpvProto.encode(["get_property", name], 1), "", name)
   })
   var levels = ["no", "fatal", "error", "warn", "info", "status", "v", "debug", "trace"]
@@ -172,7 +201,11 @@ test("every builder result is a fresh array that encode accepts", function() {
     assert.ok(Array.isArray(command), JSON.stringify(command))
     var line = MpvProto.encode(command, 7)
     assert.notStrictEqual(line, "", JSON.stringify(command))
-    assert.deepStrictEqual(JSON.parse(line), { command: command, request_id: 7 })
+    var message = JSON.parse(line)
+    // Adding a video must never make mpv wait: the line says so by itself.
+    assert.strictEqual(message.async, command[0] === "video-add" ? true : undefined)
+    delete message.async
+    assert.deepStrictEqual(message, { command: command, request_id: 7 })
   })
   // Changing a returned command changes nothing for the next caller.
   var first = MpvProto.closeWindowBind()
@@ -192,8 +225,8 @@ test("an encoded line is one line of JSON that starts with a brace", function() 
       assert.strictEqual(line.indexOf("\n"), line.length - 1)
       assert.ok(!/[\u0000-\u0009\u000b-\u001f\u007f]/.test(line))
       var message = JSON.parse(line)
-      assert.deepStrictEqual(Object.keys(message), nonBlocking ? ["command", "request_id", "async"]
-        : ["command", "request_id"])
+      assert.deepStrictEqual(Object.keys(message), nonBlocking || command[0] === "video-add"
+        ? ["command", "request_id", "async"] : ["command", "request_id"])
       assert.strictEqual(message.request_id, 12)
     })
   })
@@ -237,6 +270,16 @@ function isReachable(command) {
   if (name === "set_property" && command[1] === "volume") built = MpvProto.setVolume(command[2])
   else if (name === "set_property" && command[1] === "pause") built = MpvProto.setPause(command[2])
   else if (name === "set_property" && command[1] === "mute") built = MpvProto.setMute(command[2])
+  else if (name === "set_property" && command[1] === "vid") built = MpvProto.setVid(command[2], [command[2]])
+  else if (name === "set_property" && command[1] === "force-window") {
+    built = MpvProto.setForceWindow(command[2] === "yes")
+  } else if (name === "set_property" && command[1] === "stop-screensaver") {
+    built = MpvProto.setStopScreensaver(command[2] === "yes")
+  } else if (name === "set_property" && command[1] === "audio-device") {
+    built = MpvProto.setAudioDevice(command[2], [{ name: command[2] }])
+  } else if (name === "set_property" && command[1] === "stream-lavf-o") built = MpvProto.streamRequestSize()
+  else if (name === "playlist-remove") built = MpvProto.playlistRemove(command[1], command[1] + 1)
+  else if (name === "video-add") built = MpvProto.videoAdd(command[1])
   else if (name === "seek") built = MpvProto.seek(command[1], Const.LIMITS.durationSeconds + 1)
   else if (name === "observe_property") built = MpvProto.observe(command[2])
   else if (name === "unobserve_property") {
@@ -261,14 +304,24 @@ test("commands that run a program, write a file or open another address cannot b
     ["load-script", "/srv/x.lua"],
     ["loadlist", "/srv/list.m3u"], ["screenshot-to-file", "/srv/x.png"], ["write-watch-later-config"],
     ["dump-cache", 0, "no", "/srv/x"], ["ab-loop-dump-cache", "/srv/x"],
-    ["video-add", "https://example.com/v"],
-    ["audio-add", "/srv/a"], ["sub-add", "/srv/s"], ["script-message", "x"], ["script-binding", "x"],
-    ["keypress", "q"], ["playlist-next"], ["playlist-prev"], ["playlist-clear"], ["playlist-remove", 0],
-    ["playlist-play-index", 0], ["set", "pause", "yes"], ["cycle", "pause"], ["add", "volume", 5],
+    ["video-add", "https://example.com/v"], ["video-add", "https://example.com/v", "auto"],
+    ["video-add", "/srv/v.mkv", "auto"], ["video-add", VIDEO], ["video-add", VIDEO, "select"],
+    ["video-add", "edl://" + VIDEO, "auto"], ["video-remove", 1], ["video-reload", 1],
+    ["audio-add", "/srv/a"], ["audio-add", VIDEO, "auto"], ["sub-add", "/srv/s"], ["script-message", "x"],
+    ["script-binding", "x"], ["keypress", "q"], ["keypress", "CLOSE_WIN"], ["playlist-next"],
+    ["playlist-prev"], ["playlist-shuffle"], ["playlist-move", 0, 1], ["playlist-remove", "current"],
+    ["playlist-remove", -1], ["playlist-remove", 200], ["playlist-play-index", "none"],
+    ["playlist-play-index", -1], ["playlist-play-index", 0], ["playlist-play-index", 1], ["playlist-clear"],
+    ["set", "pause", "yes"], ["cycle", "pause"], ["add", "volume", 5],
     ["apply-profile", "x"], ["change-list", "script-opts", "append", "a=b"], ["hook-add", "on_load", 1, 0],
     ["enable-section", "x"], ["define-section", "x", "q quit"], ["input-bind", "q", "quit"],
-    ["set_property", "ytdl", false], ["set_property", "vid", 1], ["set_property", "audio-device", "auto"],
-    ["set_property", "force-window", "yes"], ["set_property", "stop-screensaver", "yes"],
+    ["set_property", "ytdl", false], ["set_property", "vid", "auto"], ["set_property", "vid", 0],
+    ["set_property", "aid", 1], ["set_property", "audio-device", "alsa/default"],
+    ["set_property", "audio-device", "pipewire/a b"], ["set_property", "audio-device", "null"],
+    ["set_property", "force-window", "immediate"], ["set_property", "stop-screensaver", "always"],
+    ["set_property", "stream-lavf-o", { "request_size": "10485760", "http_proxy": "proxy.invalid" }],
+    ["set_property", "stream-lavf-o", "request_size=10485760"], ["set_property", "ytdl-raw-options", {}],
+    ["set_property", "audio-client-name", "x"], ["set_property", "input-ipc-server", "/srv/s"],
     ["set_property", "user-data/x", 1], ["set_property_string", "pause", "yes"],
     ["get_property_string", "path"],
     ["observe_property_string", 1, "pause"], ["client_name"], ["get_version"], ["get_time_us"]
@@ -636,7 +689,8 @@ test("every line the real mpv sent is cut and read: nothing in the traces is dro
           assert.strictEqual(message.kind, "reply")
           assert.strictEqual(message.request_id, raw.request_id)
           assert.strictEqual(message.error, raw.error === "success" ? "" : raw.error)
-          assert.deepStrictEqual(message.data, raw.data)
+          // What a failed command carries as data is not passed on.
+          assert.deepStrictEqual(message.data, raw.error === "success" ? raw.data : undefined)
         } else {
           assert.strictEqual(message.kind, "event")
           assert.strictEqual(message.event, raw.event)
@@ -646,6 +700,7 @@ test("every line the real mpv sent is cut and read: nothing in the traces is dro
           assert.strictEqual(message.id, raw.id || 0)
           assert.strictEqual(message.name, raw.name || "")
           assert.deepStrictEqual(message.data, raw.data)
+          assert.deepStrictEqual(message.args, raw.args || [])
         }
       })
     })
@@ -670,15 +725,41 @@ test("the real mpv accepted every command of the vocabulary that the traces sent
   var expected = [
     "keybind CLOSE_WIN", "observe_property 1", "observe_property 2", "observe_property 3",
     "observe_property 4", "observe_property 5", "observe_property 6", "observe_property 7",
-    "observe_property 8", "unobserve_property 7",
+    "observe_property 8", "observe_property 9", "observe_property 10", "observe_property 11",
+    "observe_property 12", "observe_property 13", "observe_property 14", "unobserve_property 7",
+    "unobserve_property 9", "unobserve_property 10", "unobserve_property 11",
     "set_property pause", "set_property mute", "set_property volume", "set_property speed", "seek", "stop",
-    "get_property time-pos", "af add", "af remove", "quit"
+    "set_property vid", "set_property force-window", "set_property stop-screensaver",
+    "set_property stream-lavf-o", "set_property audio-device", "playlist-remove 0", "playlist-remove 3",
+    "get_property time-pos", "get_property playlist", "get_property track-list",
+    "get_property audio-device-list", "af add", "af remove", "quit"
   ]
   expected.forEach(function(command) {
     assert.ok(accepted.has(command), command)
   })
-  // The shape of a load (an index of -1, then options as an object) was
-  // accepted too. The address differs: the traces play local files.
+  // mpv can also be told to jump to an entry of its playlist and to empty
+  // the list around the playing one, and the traces hold both. The plugin
+  // has no word for either: it moves by loading and removing alone, and a
+  // jump to a position that is not there makes mpv stop playing.
+  var sent = new Set()
+  Object.keys(fixture.traces).forEach(function(name) {
+    fixture.traces[name].forEach(function(record) {
+      if (record.send !== undefined) sent.add(record.send[0])
+    })
+  })
+  var unused = ["playlist-play-index", "playlist-clear"]
+  unused.forEach(function(name) {
+    assert.ok(sent.has(name), name)
+    accepted.forEach(function(command) {
+      assert.notStrictEqual(command.split(" ")[0], name)
+    })
+  })
+  assert.strictEqual(MpvProto.encode(["playlist-play-index", 0], 1), "")
+  assert.strictEqual(MpvProto.encode(["playlist-clear"], 1), "")
+  assert.strictEqual(MpvProto.playlistPlayIndex, undefined)
+  assert.strictEqual(MpvProto.playlistClear, undefined)
+  // The shape of a load (an index, then options as an object) was accepted
+  // too. The address differs: the traces play local files.
   var loads = []
   Object.keys(fixture.traces).forEach(function(name) {
     fixture.traces[name].forEach(function(record) {
@@ -688,10 +769,11 @@ test("the real mpv accepted every command of the vocabulary that the traces sent
   assert.ok(loads.length >= 30)
   loads.forEach(function(command) {
     assert.strictEqual(command.length, 5)
-    assert.strictEqual(command[3], -1)
+    assert.strictEqual(command[3], command[2] === "insert-at" ? 0 : -1)
     assert.strictEqual(typeof command[4]["force-media-title"], "string")
-    assert.ok(["replace", "append-play"].indexOf(command[2]) !== -1)
+    assert.ok(["replace", "append-play", "insert-at"].indexOf(command[2]) !== -1)
   })
+  assert.ok(loads.some(function(command) { return command[2] === "insert-at" }))
   assert.ok(loads.some(function(command) { return command[4]["start"] === "11" }))
 })
 
@@ -704,6 +786,156 @@ test("no trace asks mpv for its log, and none carries a path or an address", fun
   assert.ok(!/[a-z]+:\/\//.test(text), "no address")
   var names = text.match(/<[a-z]+>/g) || []
   names.forEach(function(name) {
-    assert.ok(["<a>", "<b>", "<c>", "<long>", "<missing>", "<text>"].indexOf(name) !== -1, name)
+    assert.ok(["<a>", "<b>", "<c>", "<long>", "<missing>", "<text>", "<v>"].indexOf(name) !== -1, name)
   })
+  // The audio outputs of the machine the traces were recorded on are not
+  // in them: wherever mpv told its list, the same made-up one stands.
+  var lists = new Set()
+  Object.keys(fixture.traces).forEach(function(name) {
+    fixture.traces[name].forEach(function(record) {
+      var line = record.recv
+      if (line === undefined || !Array.isArray(line.data)) return
+      var named = line.data.some(function(item) { return item !== null && item.description !== undefined })
+      if (line.name === "audio-device-list" || named) lists.add(JSON.stringify(line.data))
+    })
+  })
+  assert.strictEqual(lists.size, 1)
+  JSON.parse(Array.from(lists)[0]).forEach(function(device) {
+    assert.ok(/^(auto|pipewire\/stub\.[a-z]+)$/.test(device.name), device.name)
+  })
+})
+
+// ---- The values of properties, as the real mpv told them ----
+
+// Every value the traces hold for a property, in the order mpv sent them:
+// as a change it reported and as the answer to a question about it.
+// A list without the entries that repeat the one before: mpv tells a value
+// again whenever a property is observed anew.
+function calmed(list) {
+  return list.filter(function(item, i) { return i === 0 || list[i - 1] !== item })
+}
+
+function valuesOf(trace, property) {
+  var asked = new Set()
+  var values = []
+  var id = 0
+  trace.forEach(function(record) {
+    if (record.send !== undefined) {
+      id++
+      if (record.send[0] === "get_property" && record.send[1] === property) asked.add(id)
+      return
+    }
+    var line = record.recv
+    if (line === undefined) return
+    if (line.event === "property-change" && line.name === property) values.push(line.data)
+    else if (asked.has(line.request_id)) values.push(line.data)
+  })
+  return values
+}
+
+test("a playlist mpv reported becomes one id for each of its entries", function() {
+  var reports = 0
+  Object.keys(fixture.traces).forEach(function(name) {
+    valuesOf(fixture.traces[name], "playlist").forEach(function(data) {
+      reports++
+      var ids = MpvProto.playlistIds(data)
+      assert.strictEqual(ids.length, data.length, name)
+      ids.forEach(function(id, i) {
+        assert.ok(Number.isInteger(id) && id >= 1, name)
+        assert.strictEqual(id, data[i].id, name)
+      })
+      assert.strictEqual(new Set(ids).size, ids.length, name + ": an entry id is in the playlist once")
+    })
+  })
+  assert.ok(reports > 80)
+  var edit = valuesOf(fixture.traces.playlist_edit, "playlist").map(function(data) {
+    return MpvProto.playlistIds(data).join()
+  })
+  // Appended twice, inserted in front, the last removed, then the first.
+  var steps = ["1", "1,2,3", "4,1,2,3", "4,1,2", "1,2"]
+  var at = -1
+  steps.forEach(function(step) {
+    at = edit.indexOf(step, at + 1)
+    assert.ok(at !== -1, step + " in " + edit.join(" | "))
+  })
+  assert.deepStrictEqual(MpvProto.playlistIds(valuesOf(fixture.traces.playlist_clear, "playlist").pop()), [1])
+})
+
+test("the tracks mpv listed: a video that was added, and none after the file changed", function() {
+  var lists = valuesOf(fixture.traces.video_track_change, "track-list").map(function(data) {
+    return MpvProto.videoTracks(data).join()
+  })
+  // None, the added one, none on the next file, the one added to that, and
+  // none again when mpv quits.
+  assert.deepStrictEqual(calmed(lists), ["", "1", "", "1", ""])
+  // The file's own audio track is listed all along and is never taken.
+  valuesOf(fixture.traces.video_show_hide, "track-list").forEach(function(data) {
+    assert.ok(data.some(function(track) { return track.type === "audio" && track.id === 1 }))
+    assert.ok(MpvProto.videoTracks(data).length <= 1)
+  })
+  var failed = valuesOf(fixture.traces.video_add_fails, "track-list")
+  assert.deepStrictEqual(MpvProto.videoTracks(failed[failed.length - 1]), [])
+  // Only the id travels on: the list also names where each track is from.
+  assert.ok(JSON.stringify(valuesOf(fixture.traces.video_show_hide, "track-list")).indexOf("<v>") !== -1)
+})
+
+test("the selected track and the picture, as mpv told them", function() {
+  var shown = valuesOf(fixture.traces.video_show_hide, "vid").map(MpvProto.trackId)
+  assert.deepStrictEqual(shown, [0, 1])
+  var picture = valuesOf(fixture.traces.video_show_hide, "video-params").map(MpvProto.hasPicture)
+  assert.deepStrictEqual(picture, [false, true])
+  // The user closes the window: no track is selected and no picture is
+  // left, without a word from us.
+  var closed = fixture.traces.video_closed
+  var at = closed.findIndex(function(record) { return record.other !== undefined })
+  assert.deepStrictEqual(closed[at].other, ["keypress", "CLOSE_WIN"])
+  var after = closed.slice(at + 1)
+  assert.deepStrictEqual(valuesOf(after, "vid").map(MpvProto.trackId), [0])
+  assert.deepStrictEqual(valuesOf(after, "video-params").map(MpvProto.hasPicture), [false])
+  assert.ok(after.some(function(record) {
+    return record.recv && record.recv.event === "client-message"
+      && JSON.stringify(record.recv.args) === JSON.stringify([MpvProto.VIDEO_CLOSED])
+  }))
+  // A file change drops the selection, and selecting again brings it back.
+  var changed = valuesOf(fixture.traces.video_track_change, "vid").map(MpvProto.trackId)
+  assert.deepStrictEqual(calmed(changed), [0, 1, 0, 1])
+})
+
+test("adding a video: answered when it is done, with an error when it cannot be opened", function() {
+  var answers = function(name) {
+    var trace = fixture.traces[name]
+    var id = 0
+    var found = []
+    trace.forEach(function(record) {
+      if (record.send === undefined) return
+      id++
+      if (record.send[0] !== "video-add") return
+      assert.strictEqual(record.async, true, name + ": never without the mark that mpv must not wait")
+      var request = id
+      var reply = trace.filter(function(other) { return other.recv && other.recv.request_id === request })
+      assert.strictEqual(reply.length, 1, name)
+      found.push(MpvProto.parse(JSON.stringify(reply[0].recv)).error)
+    })
+    return found
+  }
+  assert.deepStrictEqual(answers("video_show_hide"), [""])
+  assert.deepStrictEqual(answers("video_track_change"), ["", ""])
+  assert.deepStrictEqual(answers("video_add_fails"), ["error running command"])
+})
+
+test("the outputs mpv listed can be selected, and nothing else can", function() {
+  var trace = fixture.traces.output_select
+  var lists = valuesOf(trace, "audio-device-list")
+  assert.ok(lists.length >= 2)
+  lists.forEach(function(data) {
+    var list = MpvProto.devices(data)
+    assert.strictEqual(list.length, data.length)
+    list.forEach(function(device) {
+      assert.deepStrictEqual(Object.keys(device), ["name", "description"])
+      assert.deepStrictEqual(MpvProto.setAudioDevice(device.name, list),
+        ["set_property", "audio-device", device.name])
+    })
+    assert.strictEqual(MpvProto.setAudioDevice("pipewire/not.listed", list), null)
+  })
+  assert.deepStrictEqual(valuesOf(trace, "audio-device").map(MpvProto.deviceName), ["auto"])
 })

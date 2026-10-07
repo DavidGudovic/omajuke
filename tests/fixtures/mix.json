@@ -1,0 +1,979 @@
+{
+  "id": "RDAAAAAAAAAAA",
+  "title": "Mix - Synthetic track one",
+  "_type": "playlist",
+  "entries": [
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "AAAAAAAAAAA",
+      "url": "https://www.youtube.com/watch?v=AAAAAAAAAAA",
+      "title": "Synthetic track one",
+      "description": null,
+      "duration": 213,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Channel",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Channel",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/AAAAAAAAAAA/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR001",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR001",
+      "title": "Synthetic related track 1",
+      "description": null,
+      "duration": 181,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR001/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR002",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR002",
+      "title": "Synthetic related track 2",
+      "description": null,
+      "duration": 182,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR002/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR003",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR003",
+      "title": "Synthetic related track 3",
+      "description": null,
+      "duration": 183,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR003/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR004",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR004",
+      "title": "Synthetic related track 4",
+      "description": null,
+      "duration": 184,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR004/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR005",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR005",
+      "title": "Synthetic related track 5",
+      "description": null,
+      "duration": 185,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR005/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR006",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR006",
+      "title": "Synthetic related track 6",
+      "description": null,
+      "duration": 186,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR006/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR007",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR007",
+      "title": "Synthetic related track 7",
+      "description": null,
+      "duration": 187,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR007/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR008",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR008",
+      "title": "Synthetic related track 8",
+      "description": null,
+      "duration": 188,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR008/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR003",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR003",
+      "title": "Synthetic related track 3, listed twice",
+      "description": null,
+      "duration": 183,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR003/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    null,
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR009",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR009",
+      "title": "Synthetic premiere in a mix",
+      "description": null,
+      "duration": null,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR009/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": "is_upcoming",
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "short",
+      "url": "https://www.youtube.com/watch?v=short",
+      "title": "Synthetic mix entry with a short id",
+      "description": null,
+      "duration": 200,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/short/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR010",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR010",
+      "title": "  Related \u202etrack\u202c \u200bwith\u00a0marks\u0007\n and a line break  ",
+      "description": null,
+      "duration": 190,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR010/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR011",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR011",
+      "title": "<img src=\"http://127.0.0.1:9/x\"> & <b>markup</b>",
+      "description": null,
+      "duration": 191,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR011/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR012",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR012",
+      "title": "Synthetic related stream",
+      "description": null,
+      "duration": null,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR012/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": "is_live",
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR013",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR013",
+      "title": "Synthetic related track 13",
+      "description": null,
+      "duration": 193,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR013/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR014",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR014",
+      "title": "Synthetic related track 14",
+      "description": null,
+      "duration": 194,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR014/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR015",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR015",
+      "title": "Synthetic related track 15",
+      "description": null,
+      "duration": 195,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR015/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR016",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR016",
+      "title": "Synthetic related track 16",
+      "description": null,
+      "duration": 196,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR016/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR017",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR017",
+      "title": "Synthetic related track 17",
+      "description": null,
+      "duration": 197,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR017/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR018",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR018",
+      "title": "Synthetic related track 18",
+      "description": null,
+      "duration": 198,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR018/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR019",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR019",
+      "title": "Synthetic related track 19",
+      "description": null,
+      "duration": 199,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR019/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR020",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR020",
+      "title": "Synthetic related track 20",
+      "description": null,
+      "duration": 200,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR020/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR021",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR021",
+      "title": "Synthetic related track 21",
+      "description": null,
+      "duration": 201,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR021/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR022",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR022",
+      "title": "Synthetic related track 22",
+      "description": null,
+      "duration": 202,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR022/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR023",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR023",
+      "title": "Synthetic related track 23",
+      "description": null,
+      "duration": 203,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR023/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR024",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR024",
+      "title": "Synthetic related track 24",
+      "description": null,
+      "duration": 204,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR024/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR025",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR025",
+      "title": "Synthetic related track 25",
+      "description": null,
+      "duration": 205,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR025/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR026",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR026",
+      "title": "Synthetic related track 26",
+      "description": null,
+      "duration": 206,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR026/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR027",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR027",
+      "title": "Synthetic related track 27",
+      "description": null,
+      "duration": 207,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR027/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR028",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR028",
+      "title": "Synthetic related track 28",
+      "description": null,
+      "duration": 208,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR028/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR029",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR029",
+      "title": "Synthetic related track 29",
+      "description": null,
+      "duration": 209,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR029/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR030",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR030",
+      "title": "Synthetic related track 30",
+      "description": null,
+      "duration": 210,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR030/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR031",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR031",
+      "title": "Synthetic related track 31",
+      "description": null,
+      "duration": 211,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR031/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR032",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR032",
+      "title": "Synthetic related track 32",
+      "description": null,
+      "duration": 212,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR032/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR033",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR033",
+      "title": "Synthetic related track 33",
+      "description": null,
+      "duration": 213,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR033/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "RRRRRRRR034",
+      "url": "https://www.youtube.com/watch?v=RRRRRRRR034",
+      "title": "Synthetic related track 34",
+      "description": null,
+      "duration": 214,
+      "channel_id": "UCAAAAAAAAAAAAAAAAAAAAAA",
+      "channel": "Synthetic Artist",
+      "channel_url": "https://www.youtube.com/channel/UCAAAAAAAAAAAAAAAAAAAAAA",
+      "uploader": "Synthetic Artist",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/RRRRRRRR034/hqdefault.jpg",
+          "height": 94,
+          "width": 168
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": null,
+      "live_status": null,
+      "channel_is_verified": null
+    }
+  ],
+  "webpage_url": "https://www.youtube.com/watch?v=AAAAAAAAAAA&list=RDAAAAAAAAAAA",
+  "original_url": "https://www.youtube.com/watch?v=AAAAAAAAAAA&list=RDAAAAAAAAAAA",
+  "webpage_url_basename": "watch",
+  "webpage_url_domain": "youtube.com",
+  "extractor": "youtube:tab",
+  "extractor_key": "YoutubeTab",
+  "release_year": null,
+  "playlist_count": null,
+  "requested_entries": null
+}

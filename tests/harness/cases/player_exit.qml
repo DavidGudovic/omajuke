@@ -108,8 +108,9 @@ QtObject {
     return lines.length > 0 ? lines[lines.length - 1].command : null
   }
 
-  // The player's timers. It has one: the watchdog over a load.
-  function watchdogs() {
+  // The player's timers. It has two: the watchdog over a load, and a short
+  // one for asking mpv about its playlist.
+  function timers() {
     var found = []
     var parts = root.player.resources
     for (var i = 0; i < parts.length; i++) {
@@ -120,12 +121,17 @@ QtObject {
   }
 
   function watchdogRuns() {
-    var timers = root.watchdogs()
-    if (timers.length !== 1 || timers[0].interval !== Const.TIMEOUTS.loadMs) {
-      root.h.check(false, "the player has exactly one timer, the load watchdog")
+    var all = root.timers()
+    var watchdogs = all.filter(function(timer) { return timer.interval === Const.TIMEOUTS.loadMs })
+    if (all.length !== 2 || watchdogs.length !== 1) {
+      root.h.check(false, "the player has two timers, and one of them is the load watchdog")
       return false
     }
-    return timers[0].running
+    return watchdogs[0].running
+  }
+
+  function anyTimerRuns() {
+    return root.timers().some(function(timer) { return timer.running })
   }
 
   // then(names): the names in a directory.
@@ -142,7 +148,7 @@ QtObject {
     root.until("an mpv that dies is reported", root.told("exited true"), 8000, function() {
       h.equal(root.signals, ["idle", "loading 1", "started 1", "exited true"], "a crash while a track plays")
       h.equal(root.facts(), ["off", "idle", 0, false], "nothing is current afterwards")
-      h.check(!root.watchdogRuns(), "and no timer is left running")
+      h.check(!root.watchdogRuns() && !root.anyTimerRuns(), "and no timer is left running")
       root.next()
     })
   }

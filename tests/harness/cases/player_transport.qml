@@ -110,10 +110,10 @@ QtObject {
     h.equal([root.player.volume, root.player.muted], [55, true], "the saved volume and mute, before any mpv")
     root.load(1)
     root.until("the track plays", root.playing, 8000, function() {
-      h.equal(root.since(8).slice(0, 3).map(function(command) { return command[0] + " " + command[1] }),
+      h.equal(root.since(9).slice(0, 3).map(function(command) { return command[0] + " " + command[1] }),
         ["set_property mute", "af add", "loadfile https://www.youtube.com/watch?v=AAAAAAAAAAA"],
         "the saved mute and the levelling filter are sent before the load")
-      h.equal(root.since(8).slice(0, 2), [["set_property", "mute", true], root.levelOn], "with these values")
+      h.equal(root.since(9).slice(0, 2), [["set_property", "mute", true], root.levelOn], "with these values")
       h.equal(h.log("mpv-start")[0].argv.filter(function(arg) { return arg.indexOf("--volume=") === 0 }),
         ["--volume=55"], "the saved volume is in mpv's arguments")
       h.equal([root.player.volume, root.player.muted], [55, true], "and mpv reports both back")
@@ -428,7 +428,7 @@ QtObject {
       h.equal(starts.length, 2, "a second mpv was started")
       h.equal(starts[1].argv.filter(function(arg) { return arg.indexOf("--volume=") === 0 }), ["--volume=64"],
         "with the volume as it is now")
-      h.equal(root.since(mark).slice(8, 11),
+      h.equal(root.since(mark).slice(9, 12),
         [["observe_property", 7, "time-pos"], ["set_property", "mute", true], root.levelOn],
         "the watch, the mute and the filter are part of its handshake")
       // A saved value that changes while mpv runs is not sent to it: the

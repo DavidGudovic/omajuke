@@ -23,6 +23,17 @@ QtObject {
 
   readonly property string idA: "AAAAAAAAAAA"
 
+  // Every step counts what mpv was told after something happened to it.
+  // With related tracks on, the service adds the next one to mpv's list a
+  // moment after a track starts, and that command would land among the
+  // counted ones on some runs and not on others. Related tracks have their
+  // own cases; here the user has switched them off.
+  function setup(h, done) {
+    var entry = { id: h.manifest.id, autoplay: false }
+    h.shell.barConfig = { position: "top", layout: { left: [], center: [], right: [entry] } }
+    done()
+  }
+
   function run(h) {
     root.h = h
     h.scenario({ ytdlp: "ok", mpv: "ok" })

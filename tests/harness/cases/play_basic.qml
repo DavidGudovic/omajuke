@@ -22,6 +22,14 @@ QtObject {
   readonly property string title: "A,vid=1 \"q\""
   readonly property string watchUrl: "https://www.youtube.com/watch?v=AAAAAAAAAAA"
 
+  // Related tracks are another case's subject. Here the user has switched
+  // them off, so a queue ends where the user's own tracks end.
+  function setup(h, done) {
+    var entry = { id: h.manifest.id, autoplay: false }
+    h.shell.barConfig = { position: "top", layout: { left: [], center: [], right: [entry] } }
+    done()
+  }
+
   function run(h) {
     root.h = h
     h.scenario({ ytdlp: "ok", mpv: "ok" })
@@ -66,7 +74,9 @@ QtObject {
         "ready: the values of a first start")
       h.equal(s.settings.rememberHistory, true, "ready: the settings are the user's, not the cautious ones")
       h.equal([h.log("ytdlp").length, h.log("mpv-start").length], [0, 0], "ready: no tool has run")
-      h.equal(h.jobs().map(function(job) { return job.tag }), ["prepare"], "ready: one job, the preparation")
+      // The second looks whether a saved login is there; it asks nobody.
+      h.equal(h.jobs().map(function(job) { return job.tag }), ["prepare", "prepare-data"],
+        "ready: two jobs, the preparations")
       root.next()
     })
   }
@@ -82,7 +92,7 @@ QtObject {
       { id: "../../../etc", title: "t", channel: "c", duration: 5, live: false }
     ]
     for (var i = 0; i < bad.length; i++) h.equal(s.playTrack(bad[i]), false, "bad row " + i + ": refused")
-    h.equal([s.playbackState, s.queue.length, h.jobs().length], ["idle", 0, 1], "bad rows: nothing started")
+    h.equal([s.playbackState, s.queue.length, h.jobs().length], ["idle", 0, 2], "bad rows: nothing started")
     root.next()
   }
 
@@ -124,7 +134,7 @@ QtObject {
       h.equal([status.volume, status.muted, status.queueLength, status.queueIndex, status.error],
         [70, false, 1, 0, ""], "status: the counters")
       h.equal([status.video, status.output, status.signedIn, status.updatePending],
-        ["hidden", "", false, false], "status: what later versions fill in")
+        ["hidden", "", false, false], "status: no video window, the default output, nobody signed in")
       h.check(status.position > 0 && Math.round(status.position * 10) === status.position * 10,
         "status: the position, to a tenth of a second")
       root.next()
@@ -147,7 +157,7 @@ QtObject {
     var jobs = JSON.stringify(h.jobs())
     h.check(jobs.indexOf(root.id) === -1 && jobs.indexOf("watch?v") === -1, "no id in any command line")
     h.check(jobs.indexOf("vid=1") === -1, "no title in any command line")
-    h.equal(h.jobs().map(function(job) { return job.tag }), ["prepare", "resolve", "write"],
+    h.equal(h.jobs().map(function(job) { return job.tag }), ["prepare", "prepare-data", "resolve", "write"],
       "lookup: prepared, looked up, written; nothing else ran")
     root.next()
   }

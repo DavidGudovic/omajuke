@@ -1,5 +1,7 @@
 "use strict"
-// Tests for the shell constants of lib/Sh.js and for wrap(). The constants
+// Tests for the shell constants of lib/Sh.js and for wrap(). The text of
+// every constant is checked here; what the three constants of signing in
+// do when they run is tested in export.test.js. The other constants
 // are run for real with /usr/bin/sh, under umask 022, inside a directory
 // this file creates below the system's temporary directory and removes
 // again. Nothing outside that directory is written. Children are started
@@ -22,6 +24,8 @@ var SH = "/usr/bin/sh"
 var EXECUTABLE = "/usr/bin/sh"
 var ABSENT = "/nonexistent/oj-tool"
 var SUBDIRS = ["deno", "info", "jar", "signin", "thumbs", "ytcache"]
+// Every piece of shell text the plugin has.
+var CONSTANTS = ["PREPARE", "PRIVATE_WRITE", "UMASK_EXEC", "PREPARE_DATA", "SIGNIN_DIRS", "COOKIE_EXPORT"]
 
 // The modes below are only meaningful under the umask the shell runs with.
 process.umask(0o022)
@@ -96,8 +100,7 @@ function tree(dir) {
 // ---- The text itself ----
 
 test("every constant is accepted by sh -n", function() {
-  var names = ["PREPARE", "PRIVATE_WRITE", "UMASK_EXEC"]
-  names.forEach(function(name) {
+  CONSTANTS.forEach(function(name) {
     var result = childProcess.spawnSync(SH, ["-n"], { input: Sh[name] + "\n", encoding: "utf8" })
     assert.strictEqual(result.status, 0, name)
     assert.strictEqual(result.stderr, "", name)
@@ -105,8 +108,7 @@ test("every constant is accepted by sh -n", function() {
 })
 
 test("the constants are plain text that names its tools by absolute path", function() {
-  var names = ["PREPARE", "PRIVATE_WRITE", "UMASK_EXEC"]
-  names.forEach(function(name) {
+  CONSTANTS.forEach(function(name) {
     var text = Sh[name]
     assert.strictEqual(typeof text, "string", name)
     assert.match(text, /^[\x20-\x7e\n]+$/, name + " is printable ASCII")
@@ -120,11 +122,40 @@ test("the constants are plain text that names its tools by absolute path", funct
   assert.strictEqual(Sh.UMASK_EXEC, "umask 077 && exec \"$@\"")
   assert.ok(Sh.PREPARE.indexOf("umask 077\n") === 0, "PREPARE sets the umask first")
   assert.ok(Sh.PRIVATE_WRITE.indexOf("umask 077\n") === 0, "PRIVATE_WRITE sets the umask first")
+  var signIn = ["PREPARE_DATA", "SIGNIN_DIRS", "COOKIE_EXPORT"]
+  signIn.forEach(function(name) {
+    assert.ok(Sh[name].indexOf("umask 077\n") === 0, name + " sets the umask first")
+  })
+})
+
+test("the constants are the only strings in the module, and no builder adds shell text", function() {
+  var texts = Object.keys(Sh).filter(function(name) { return typeof Sh[name] === "string" })
+  assert.deepStrictEqual(texts.sort(), CONSTANTS.slice().sort())
+  // A constant never changes with what it is run on: it holds no path of a
+  // session and no name but its own tools and words.
+  CONSTANTS.forEach(function(name) {
+    assert.ok(!/\/home\/|\/run\/user\/|\/tmp\//.test(Sh[name]), name)
+  })
+})
+
+test("the export reads no parameter but its five, and each of the others only its own", function() {
+  var used = function(name) {
+    var found = {}
+    var pattern = /\$\{?([0-9@*#])/g
+    var match
+    while ((match = pattern.exec(Sh[name])) !== null) found[match[1]] = true
+    return Object.keys(found).sort()
+  }
+  assert.deepStrictEqual(used("PREPARE"), ["1", "2", "3", "4", "5", "6"])
+  assert.deepStrictEqual(used("PRIVATE_WRITE"), ["1"])
+  assert.deepStrictEqual(used("UMASK_EXEC"), ["@"])
+  assert.deepStrictEqual(used("PREPARE_DATA"), ["1", "2"])
+  assert.deepStrictEqual(used("SIGNIN_DIRS"), ["1", "2"])
+  assert.deepStrictEqual(used("COOKIE_EXPORT"), ["1", "2", "3", "4", "5"])
 })
 
 test("every parameter of the constants is used inside double quotes", function() {
-  var names = ["PREPARE", "PRIVATE_WRITE", "UMASK_EXEC"]
-  names.forEach(function(name) {
+  CONSTANTS.forEach(function(name) {
     Sh[name].split("\n").forEach(function(line) {
       // A plain assignment from a parameter does not split words; everywhere
       // else an expansion has to sit between double quotes. A command
@@ -579,7 +610,9 @@ test("wrap takes nothing from a job but its deadline, its umask flag and its arg
 
 test("the module exports exactly the documented names", function() {
   assert.deepStrictEqual(Object.keys(Sh).sort(), [
-    "PREPARE", "PRIVATE_WRITE", "UMASK_EXEC", "cleanupArgv", "prepareArgv", "purgeArgv", "readArgv",
-    "removeArgv", "wrap", "writeArgv"
+    "COOKIE_BROWSERS", "COOKIE_EXPORT", "PREPARE", "PREPARE_DATA", "PRIVATE_WRITE", "SIGNIN_DIRS",
+    "UMASK_EXEC", "cleanupArgv", "cleanupWithJarArgv", "cookieExportArgv", "copyArgv", "prepareArgv",
+    "prepareDataArgv", "purgeArgv", "readArgv", "removeArgv", "removeTreeArgv", "signinDirsArgv", "wrap",
+    "writeArgv"
   ])
 })

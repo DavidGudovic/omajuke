@@ -36,7 +36,14 @@ ShellRoot {
 
     readonly property string stubDir: h.runDir + "/oj-stub"
     // Tools that never run for real in a test, and the stub that stands in.
-    readonly property var stubFiles: ({ mpv: "mpv.js", ytdlp: "yt-dlp.js", curl: "curl.js" })
+    // The compositor's control tool, the question for the default browser
+    // and the browser itself are among them: no case ever reaches the real
+    // ones. (browser is empty in Const.TOOLS; a path here is what makes the
+    // plugin start the stub in place of whatever browser it resolved.)
+    readonly property var stubFiles: ({
+      mpv: "mpv.js", ytdlp: "yt-dlp.js", curl: "curl.js",
+      hyprctl: "hyprctl.js", xdgSettings: "xdg-settings.js", browser: "browser.js"
+    })
 
     property var _consts: null
     property var _caseObject: null
@@ -184,6 +191,36 @@ ShellRoot {
         }
       }
       return records
+    }
+
+    // What a stub keeps between its runs, parsed: oj-stub/<tool>.state.json,
+    // or null when there is none. A stub that is started once per request
+    // (the compositor's control tool, with its table of key bindings) has no
+    // other memory. setStubState writes it, so a case can start from a
+    // table of its own; what the object means is the stub's business.
+    function stubState(tool) {
+      try {
+        return JSON.parse(h.readFile(h.stubDir + "/" + tool + ".state.json"))
+      } catch (error) {
+        return null
+      }
+    }
+
+    function setStubState(tool, obj) {
+      h.writeFile(h.stubDir + "/" + tool + ".state.json", JSON.stringify(obj))
+    }
+
+    // Tells the service that the compositor reported an event, as the
+    // connection to the compositor would: through the service's own seam,
+    // without a compositor. Returns false (and fails the case) when the
+    // service has no such seam.
+    function hyprEvent(name) {
+      if (!h.service || typeof h.service._hyprEvent !== "function") {
+        h.check(false, "hyprEvent: the service takes no compositor events")
+        return false
+      }
+      h.service._hyprEvent(String(name))
+      return true
     }
 
     // Makes the launcher's leak check see a process no stub recorded.

@@ -10,8 +10,10 @@ import "Ui.js" as Ui
 // it. This is an Item, so the UI harness can mount it without a compositor.
 //
 // It owns what belongs to one open panel and is lost when it closes: which
-// page is shown, the list cursor, the scroll position, the confirmation in
-// front of a page. It is also the one place where a key press is decided
+// page is shown, the one cursor (on a row of the page, or on one of the
+// places a page lists beside its rows: the button of a notice, the row of
+// feed chips, the buttons of the now-playing strip), the scroll position,
+// the confirmation in front of a page. It is also the one place where a key press is decided
 // (handleKey) and the one owner of the scroll area (ensureVisible). What is
 // playing, searched or stored lives in the service; this file only reads
 // the service's root members and calls its root functions, tolerates a
@@ -36,6 +38,11 @@ Item {
   // does the pointer. Nothing is highlighted until one of them first does.
   property bool cursorActive: false
   property int selectedIndex: 0
+  // The cursor can stand on the button of a notice, or on another place a
+  // page lists in noticeActions, instead of on a row: this is which one,
+  // counted through noticeActions, and -1 for none.
+  // While it is set, cursorActive is false, so one highlight shows at most.
+  property int noticeIndex: -1
   // A confirmation is open in front of the page (confirm, closeDialog).
   property bool dialogOpen: false
 
@@ -84,6 +91,21 @@ Item {
   readonly property int rowCount: pageLoader.item && typeof pageLoader.item.rowCount === "number"
     ? pageLoader.item.rowCount : 0
 
+  // The buttons of the notices on screen, top to bottom, each by the name
+  // its owner answers to: the proxy question here, else what the page lists.
+  readonly property var noticeActions: {
+    if (root.blocker === "proxy") return ["proxy"]
+    var page = pageLoader.item
+    var listed = page ? page.noticeActions : null
+    return listed && typeof listed.length === "number" ? listed : []
+  }
+  // One text for the whole list, so that a change of it is noticed even
+  // though the list is a new object each time it is computed.
+  readonly property string noticeKey: noticeActions.join(" ")
+  // The name of the button that has the cursor, "" when none has.
+  readonly property string noticeCursor: noticeIndex >= 0 && noticeIndex < noticeActions.length
+    ? noticeActions[noticeIndex] : ""
+
   property string _dialogMessage: ""
   property string _dialogConfirmText: ""
   // Called when the open confirmation is confirmed.
@@ -96,6 +118,9 @@ Item {
   signal closeRequested()
   // Tab (1) and Shift+Tab (-1): the next or the previous panel of the bar.
   signal switchRequested(int direction)
+  // The user moved the cursor, with a key or with the pointer. Rows that
+  // merely slide under the cursor (new results) do not count.
+  signal cursorSteered()
 
   // ---- Keys ----
 
@@ -124,61 +149,127 @@ Item {
   }
 
   function _context(page) {
-    // Without a page (a blocking message is showing) only the keys that
-    // close the panel or switch to another one mean anything.
+    // Without a page (a blocking message is showing) there are no rows:
+    // the keys that close the panel or switch to another one mean something,
+    // and the ones that reach the button of the message, if it has one.
     var ctx = page ? page.keyContext()
       : { hasText: false, matches: false, searching: false, rowCount: 0, rowKind: "" }
     ctx.page = root.page
     ctx.dialogOpen = root.dialogOpen
+    // The buttons of notices are places the cursor can visit, like rows.
+    ctx.rowCount = ctx.rowCount + root.noticeActions.length
+    // So are the row of feed chips and the buttons of the now-playing
+    // strip, each as one place: Left and Right pick the button there,
+    // where a single button has nothing sideways.
+    if (root.noticeCursor !== "") ctx.rowKind = Ui.placeKind(root.noticeCursor)
+    ctx.fixed = root._fixedPlaces(page)
     return ctx
   }
 
   function _perform(action, typing, text, page) {
     if (action === "none") return
     if (action === "close") root.closeRequested()
-    else if (action === "back") root.go("main")
+    else if (action === "back") root.back()
     else if (action === "switchNext") root.switchRequested(1)
     else if (action === "switchPrev") root.switchRequested(-1)
     else if (action === "down") root._move(1, typing)
     else if (action === "up") root._move(-1, typing)
     else if (action === "pageDown") root._move(Ui.STEP.page, typing)
     else if (action === "pageUp") root._move(-Ui.STEP.page, typing)
+    else if (action === "activate" && root.noticeCursor !== "") root.answerNotice(root.noticeCursor)
     else if (page) page.act(action, text)
   }
 
+  // How many of the page's places beside its rows are buttons that are
+  // always there, at the front of noticeActions.
+  function _fixedPlaces(page) {
+    return page && typeof page.fixedPlaces === "number" ? page.fixedPlaces : 0
+  }
+
   function _move(delta, typing) {
-    // The first press only shows the highlight where it is.
-    if (root.cursorActive) root.selectedIndex = Ui.clampIndex(root.selectedIndex + delta, root.rowCount)
-    else root.cursorActive = true
+    var at = { active: root.cursorActive, index: root.selectedIndex, action: root.noticeIndex }
+    var fixed = root._fixedPlaces(pageLoader.item)
+    var to = Ui.moveCursor(at, delta, root.rowCount, root.noticeActions.length, fixed)
+    root.noticeIndex = to.action
+    root.selectedIndex = to.index
+    root.cursorActive = to.active
     // The rows have the keyboard from here on: Space is play or pause now,
     // not a character.
     if (typing) keyRouter.forceActiveFocus()
     pointerGate.reset()
+    root.cursorSteered()
+  }
+
+  // Presses the button of a notice, for a click on it and for Enter while
+  // it has the cursor alike. The proxy question is asked here, in place of
+  // any page; every other notice belongs to the page that shows it.
+  function answerNotice(name) {
+    var page = pageLoader.item
+    if (name === "proxy") {
+      if (root.blocker === "proxy" && root.liveService) root.liveService.acknowledgeProxy()
+    } else if (page && typeof page.answerNotice === "function") {
+      page.answerNotice(name)
+    }
   }
 
   // ---- For the pages ----
 
   // Shows another page. Sub-pages are named by the pages that lead to them.
   function go(name) {
-    if (name !== "main" && name !== "settings") return
+    if (Ui.PAGES.indexOf(name) === -1) return
     root.closeDialog()
+    // Before the page changes: the new page may then say where its cursor
+    // starts (the queue page starts on the track that is playing).
+    root._clearCursor()
     root.page = name
+  }
+
+  // Leaves a sub-page for the page it was reached from.
+  function back() {
+    root.go(Ui.parentPage(root.page))
+  }
+
+  // A page that was just shown: nothing is highlighted and its top is in
+  // view.
+  function _clearCursor() {
     root.cursorActive = false
     root.selectedIndex = 0
+    root.noticeIndex = -1
     flick.contentY = 0
     pointerGate.reset()
   }
 
+  // Puts the cursor on a row.
   function setCursor(index) {
+    root.noticeIndex = -1
     root.cursorActive = true
     root.selectedIndex = Ui.clampIndex(index, root.rowCount)
+  }
+
+  // Takes the cursor off the button of a notice. A page calls this when
+  // the notice under the cursor is no longer the one the user was shown.
+  function clearNoticeCursor() {
+    root.noticeIndex = -1
+  }
+
+  // Takes the highlight off the rows. A page calls this when its rows were
+  // replaced by other ones (another list, other buttons, another screen),
+  // so that the next Enter shows the highlight again, at the top, instead
+  // of acting on a row the user has not looked at. A highlight on the
+  // button of a notice stays: the notice is still the same.
+  function dropCursor() {
+    root.cursorActive = false
+    root.selectedIndex = 0
+    pointerGate.reset()
   }
 
   // A row reports the pointer over it. Rows also slide under a pointer that
   // rests (new results, scrolling), and only a real movement may move the
   // highlight.
   function pointAt(index, item, mouse) {
-    if (pointerGate.moved(item, mouse)) root.setCursor(index)
+    if (!pointerGate.moved(item, mouse)) return
+    root.setCursor(index)
+    root.cursorSteered()
   }
 
   function disarmPointer() {
@@ -226,11 +317,8 @@ Item {
 
   function _reset() {
     root.closeDialog()
+    root._clearCursor()
     root.page = "main"
-    root.cursorActive = false
-    root.selectedIndex = 0
-    flick.contentY = 0
-    pointerGate.reset()
   }
 
   // The service counts open panels: it fetches thumbnails and reports the
@@ -254,6 +342,9 @@ Item {
   // Unloaded on the main page, so the next open creates one page, not two.
   onShowingChanged: if (!root.showing) root._reset()
   onRowCountChanged: root.selectedIndex = Ui.clampIndex(root.selectedIndex, root.rowCount)
+  // A notice came or went, so the count no longer names the same button:
+  // the cursor lets go rather than land on one the user did not choose.
+  onNoticeKeyChanged: root.noticeIndex = -1
   // While open, the keyboard follows the page: to the search field when the
   // main page appears, to the key router when a page without a field does.
   // On open this asks for the same item as the panel window's own request.
@@ -302,18 +393,19 @@ Item {
           visible: root.blocker !== ""
           text: root.blockerText
           primaryLabel: root.blocker === "proxy" ? Ui.TEXT.PROXY_CONTINUE : ""
+          cursor: root.noticeCursor === "proxy" ? "primary" : ""
           fg: root.fg
           fontFamily: root.fontFamily
-          onPrimary: if (root.blocker === "proxy" && root.liveService) root.liveService.acknowledgeProxy()
+          onPrimary: root.answerNotice("proxy")
         }
 
         PageHeader {
           width: parent.width
           visible: root.page !== "main" && pageLoader.item !== null
-          title: root.page === "settings" ? Ui.TEXT.SETTINGS : ""
+          title: Ui.pageTitle(root.page)
           fg: root.fg
           fontFamily: root.fontFamily
-          onBack: root.go("main")
+          onBack: root.back()
         }
 
         // Active through the fade-out as well: destroying the page at the
@@ -323,7 +415,11 @@ Item {
           id: pageLoader
           width: parent.width
           active: root.showing && root.blocker === ""
-          sourceComponent: root.page === "settings" ? settingsPage : mainPage
+          sourceComponent: root.page === "settings" ? settingsPage
+            : (root.page === "queue" ? queuePage
+              : (root.page === "outputs" ? outputsPage
+                : (root.page === "shortcuts" ? shortcutsPage
+                  : (root.page === "signin" ? signInPage : mainPage))))
         }
       }
     }
@@ -357,6 +453,13 @@ Item {
   //   handleKey(e, t)  keys only this page knows, true when it took one
   //   act(action, t)   carries out a page action Ui.keyAction chose
   //   navigate(page)   signal: asks for another page
+  // and, when it has places for the cursor beside its rows (the buttons
+  // of notices; on the main page also the settings button, the feed chips
+  // and the now-playing strip):
+  //   noticeActions    the names of those places, in the order Up and
+  //                    Down go through them, the one nearest the rows last
+  //   fixedPlaces      how many of them, at the front, are always there
+  //   answerNotice(n)  presses the button of that name
 
   Component {
     id: mainPage
@@ -372,6 +475,46 @@ Item {
     id: settingsPage
 
     SettingsPage {
+      service: root.liveService
+      body: root
+      onNavigate: function(page) { root.go(page) }
+    }
+  }
+
+  Component {
+    id: queuePage
+
+    QueuePage {
+      service: root.liveService
+      body: root
+      onNavigate: function(page) { root.go(page) }
+    }
+  }
+
+  Component {
+    id: outputsPage
+
+    OutputsPage {
+      service: root.liveService
+      body: root
+      onNavigate: function(page) { root.go(page) }
+    }
+  }
+
+  Component {
+    id: shortcutsPage
+
+    ShortcutsPage {
+      service: root.liveService
+      body: root
+      onNavigate: function(page) { root.go(page) }
+    }
+  }
+
+  Component {
+    id: signInPage
+
+    SignInPage {
       service: root.liveService
       body: root
       onNavigate: function(page) { root.go(page) }

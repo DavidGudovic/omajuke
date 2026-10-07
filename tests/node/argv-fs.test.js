@@ -14,6 +14,7 @@ var Paths = load.lib("Paths")
 var TOOLS = Const.TOOLS
 var R = "/run/user/1000/omajuke"
 var S = "/home/user/.local/state/omajuke"
+var D = "/home/user/.local/share/omajuke"
 
 var paths = Paths.resolve({
   XDG_RUNTIME_DIR: "/run/user/1000", XDG_STATE_HOME: null, XDG_DATA_HOME: null, HOME: "/home/user"
@@ -34,7 +35,13 @@ function everyArgv(tools, p) {
     readArgv: Sh.readArgv(tools, p.stateFile, Const.LIMITS.stateBytes),
     removeArgv: Sh.removeArgv(tools, [Paths.infoFile(p, 1), Paths.thumbFile(p, 2)]),
     purgeArgv: Sh.purgeArgv(tools, p.infoDir),
-    cleanupArgv: Sh.cleanupArgv(tools, p)
+    cleanupArgv: Sh.cleanupArgv(tools, p),
+    cleanupWithJarArgv: Sh.cleanupWithJarArgv(tools, p),
+    prepareDataArgv: Sh.prepareDataArgv(tools, p),
+    signinDirsArgv: Sh.signinDirsArgv(tools, Paths.signinAttemptDir(p, 3), "firefox"),
+    cookieExportArgv: Sh.cookieExportArgv(tools, "chrome", Paths.signinAttemptDir(p, 3), p.jarFile),
+    removeTreeArgv: Sh.removeTreeArgv(tools, Paths.signinAttemptDir(p, 3)),
+    copyArgv: Sh.copyArgv(tools, p.jarFile, Paths.jarCopyFile(p, 4))
   }
 }
 
@@ -42,6 +49,7 @@ test("the paths used here resolve to the usual places", function() {
   assert.strictEqual(paths.ok, true)
   assert.strictEqual(paths.runtimeDir, R)
   assert.strictEqual(paths.stateDir, S)
+  assert.strictEqual(paths.dataDir, D)
 })
 
 test("prepareArgv is the constant script with its six parameters", function() {
@@ -99,6 +107,54 @@ test("cleanupArgv removes exactly the seven runtime paths, bounded by timeout al
   assert.ok(removed.every(function(target) { return target.indexOf(S) !== 0 }), "nothing of the state dir")
 })
 
+test("cleanupWithJarArgv is the same clean-up with the saved login as its last target", function() {
+  var argv = Sh.cleanupWithJarArgv(TOOLS, paths)
+  assert.deepStrictEqual(argv, Sh.cleanupArgv(TOOLS, paths).concat([D + "/cookies.txt"]))
+  // The file alone: the data directory and whatever else is in it stay.
+  assert.ok(argv.indexOf(D) === -1)
+  assert.strictEqual(argv.filter(function(part) { return part.indexOf(D) === 0 }).length, 1)
+  var usual = Sh.cleanupArgv(TOOLS, paths)
+  assert.ok(usual.indexOf(D + "/cookies.txt") === -1, "the usual clean-up keeps the login")
+})
+
+test("prepareDataArgv is the constant script with the data directory and the login file", function() {
+  assert.deepStrictEqual(Sh.prepareDataArgv(TOOLS, paths),
+    ["/usr/bin/sh", "-c", Sh.PREPARE_DATA, "omajuke-prepare-data", D, D + "/cookies.txt"])
+})
+
+test("signinDirsArgv is the constant script, the attempt directory and the family", function() {
+  assert.deepStrictEqual(Sh.signinDirsArgv(TOOLS, R + "/signin/3", "firefox"),
+    ["/usr/bin/sh", "-c", Sh.SIGNIN_DIRS, "omajuke-signin-dirs", R + "/signin/3", "firefox"])
+  assert.deepStrictEqual(Sh.signinDirsArgv(TOOLS, R + "/signin/4", "chromium").slice(4),
+    [R + "/signin/4", "chromium"])
+})
+
+test("cookieExportArgv names the attempt's own profile, the login file and the one yt-dlp", function() {
+  assert.deepStrictEqual(Sh.cookieExportArgv(TOOLS, "chrome", R + "/signin/3", D + "/cookies.txt"), [
+    "/usr/bin/sh", "-c", Sh.COOKIE_EXPORT, "omajuke-export",
+    "chrome", R + "/signin/3/profile", R + "/signin/3", D + "/cookies.txt", "/usr/bin/yt-dlp"
+  ])
+  // The profile cannot be chosen: it is always inside the attempt directory.
+  assert.strictEqual(Sh.cookieExportArgv.length, 4)
+  var other = Sh.cookieExportArgv(TOOLS, "firefox", R + "/signin/77", D + "/cookies.txt")
+  assert.strictEqual(other[5], other[6] + "/profile")
+  // No argument can carry a cookie or an address: only names and paths.
+  assert.ok(other.slice(4).every(function(part) { return !/^https?:|[=;]/.test(part) }))
+})
+
+test("removeTreeArgv is rm -rf, an end of options, and one directory", function() {
+  assert.deepStrictEqual(Sh.removeTreeArgv(TOOLS, R + "/signin/3"),
+    ["/usr/bin/rm", "-rf", "--", R + "/signin/3"])
+  assert.strictEqual(Sh.removeTreeArgv(TOOLS, R + "/signin/3").length, 4)
+})
+
+test("copyArgv is cp, an end of options, the source and the target", function() {
+  assert.deepStrictEqual(Sh.copyArgv(TOOLS, D + "/cookies.txt", R + "/jar/4.txt"),
+    ["/usr/bin/cp", "--", D + "/cookies.txt", R + "/jar/4.txt"])
+  var argv = Sh.copyArgv(TOOLS, paths.jarFile, Paths.jarCopyFile(paths, 4))
+  assert.ok(argv.every(function(part) { return part.charAt(0) !== "-" || part === "--" }), "no option but --")
+})
+
 test("every builder returns an array of strings whose first element is an absolute tool", function() {
   var all = everyArgv(TOOLS, paths)
   Object.keys(all).forEach(function(name) {
@@ -120,8 +176,14 @@ test("tools come from the table that was passed in, each in its place", function
   assert.deepStrictEqual(toolsOf(all.removeArgv), ["/marked/rm"])
   assert.deepStrictEqual(toolsOf(all.purgeArgv), ["/marked/find"])
   assert.deepStrictEqual(toolsOf(all.cleanupArgv), ["/marked/timeout", "/marked/rm"])
+  assert.deepStrictEqual(toolsOf(all.cleanupWithJarArgv), ["/marked/timeout", "/marked/rm"])
+  assert.deepStrictEqual(toolsOf(all.prepareDataArgv), ["/marked/sh"])
+  assert.deepStrictEqual(toolsOf(all.signinDirsArgv), ["/marked/sh"])
+  assert.deepStrictEqual(toolsOf(all.cookieExportArgv), ["/marked/sh", "/marked/ytdlp"])
+  assert.deepStrictEqual(toolsOf(all.removeTreeArgv), ["/marked/rm"])
+  assert.deepStrictEqual(toolsOf(all.copyArgv), ["/marked/cp"])
   Object.keys(all).forEach(function(name) {
-    assert.ok(!/\/usr\/bin\/(sh|head|rm|find|timeout|mpv|yt-dlp)"/.test(JSON.stringify(all[name])),
+    assert.ok(!/\/usr\/bin\/(sh|head|rm|find|timeout|mpv|yt-dlp|cp)"/.test(JSON.stringify(all[name])),
       name + " takes no tool from anywhere else")
   })
 })
@@ -147,6 +209,12 @@ test("nothing varies but the documented slots", function() {
   assert.deepStrictEqual(differing("removeArgv"), [3, 4], "the files")
   assert.deepStrictEqual(differing("purgeArgv"), [1], "the directory")
   assert.deepStrictEqual(differing("cleanupArgv"), [7, 8, 9, 10, 11, 12, 13], "the seven paths")
+  assert.deepStrictEqual(differing("cleanupWithJarArgv"), [7, 8, 9, 10, 11, 12, 13, 14], "and the login file")
+  assert.deepStrictEqual(differing("prepareDataArgv"), [4, 5], "the data dir and the login file")
+  assert.deepStrictEqual(differing("signinDirsArgv"), [4], "the attempt dir")
+  assert.deepStrictEqual(differing("cookieExportArgv"), [5, 6, 7], "profile, attempt dir, login file")
+  assert.deepStrictEqual(differing("removeTreeArgv"), [3], "the directory")
+  assert.deepStrictEqual(differing("copyArgv"), [2, 3], "the source and the target")
   assert.deepStrictEqual(
     Sh.readArgv(TOOLS, paths.stateFile, 10).map(function(part, i) {
       return part === Sh.readArgv(TOOLS, paths.stateFile, 99)[i] ? "" : part
@@ -159,11 +227,14 @@ test("every element is a constant, a tool, or a path from Paths", function() {
   var allowed = [
     "-c", "--", "-f", "-rf", "-k", "-mindepth", "-maxdepth", "-type", "f", "-delete", "1", "2", "5",
     "omajuke-prepare", "omajuke-write", Sh.PREPARE, Sh.PRIVATE_WRITE, Const.MPRIS_SO,
-    String(Const.LIMITS.stateBytes + 1)
+    String(Const.LIMITS.stateBytes + 1),
+    "omajuke-prepare-data", "omajuke-signin-dirs", "omajuke-export", Sh.PREPARE_DATA, Sh.SIGNIN_DIRS,
+    Sh.COOKIE_EXPORT, "firefox", "chrome"
   ]
   Object.keys(TOOLS).forEach(function(name) { allowed.push(TOOLS[name]) })
   Object.keys(paths).forEach(function(name) { allowed.push(paths[name]) })
-  allowed.push(Paths.infoFile(paths, 1), Paths.thumbFile(paths, 2))
+  allowed.push(Paths.infoFile(paths, 1), Paths.thumbFile(paths, 2), Paths.jarCopyFile(paths, 4))
+  allowed.push(Paths.signinAttemptDir(paths, 3), Paths.signinAttemptDir(paths, 3) + "/profile")
   Object.keys(all).forEach(function(name) {
     all[name].forEach(function(part) {
       assert.ok(allowed.indexOf(part) !== -1, name + " holds something else: " + part.slice(0, 60))
@@ -176,13 +247,16 @@ test("no builder can be given a video id", function() {
   // only variable part of a path is a counter.
   assert.deepStrictEqual(
     [Sh.prepareArgv.length, Sh.writeArgv.length, Sh.readArgv.length, Sh.removeArgv.length,
-      Sh.purgeArgv.length, Sh.cleanupArgv.length],
-    [2, 2, 3, 2, 2, 2])
+      Sh.purgeArgv.length, Sh.cleanupArgv.length, Sh.cleanupWithJarArgv.length, Sh.prepareDataArgv.length,
+      Sh.signinDirsArgv.length, Sh.removeTreeArgv.length, Sh.copyArgv.length],
+    [2, 2, 3, 2, 2, 2, 2, 2, 3, 2, 3])
   var id = "Abc123Def4Q"
   var hostile = [id, "../" + id, id + ".json", "x/" + id, -1, 0, 1.5, "1", null, undefined, NaN, Infinity]
   hostile.forEach(function(n) {
     assert.strictEqual(Paths.infoFile(paths, n), "", "infoFile(" + String(n) + ")")
     assert.strictEqual(Paths.thumbFile(paths, n), "", "thumbFile(" + String(n) + ")")
+    assert.strictEqual(Paths.jarCopyFile(paths, n), "", "jarCopyFile(" + String(n) + ")")
+    assert.strictEqual(Paths.signinAttemptDir(paths, n), "", "signinAttemptDir(" + String(n) + ")")
   })
   var text = JSON.stringify(everyArgv(TOOLS, paths))
   assert.ok(text.indexOf(id) === -1)
@@ -201,6 +275,16 @@ test("what the builders name is what Paths.owns guards", function() {
   Sh.cleanupArgv(TOOLS, paths).slice(7).forEach(function(target) {
     assert.strictEqual(Paths.owns(paths, target), false, target)
   })
+  // Each file operation of signing in names one path of one kind.
+  var all = everyArgv(TOOLS, paths)
+  assert.strictEqual(Paths.kind(paths, all.removeTreeArgv[3]), "signinAttempt")
+  assert.strictEqual(Paths.kind(paths, all.signinDirsArgv[4]), "signinAttempt")
+  assert.strictEqual(Paths.kind(paths, all.cookieExportArgv[6]), "signinAttempt")
+  assert.strictEqual(Paths.kind(paths, all.cookieExportArgv[7]), "jar")
+  assert.strictEqual(Paths.kind(paths, all.copyArgv[2]), "jar")
+  assert.strictEqual(Paths.kind(paths, all.copyArgv[3]), "jarCopy")
+  assert.strictEqual(Paths.kind(paths, all.prepareDataArgv[5]), "jar")
+  assert.strictEqual(Paths.kind(paths, all.cleanupWithJarArgv[14]), "jar")
 })
 
 test("the builders do not look at their paths: deciding is not their job", function() {
@@ -212,4 +296,9 @@ test("the builders do not look at their paths: deciding is not their job", funct
   assert.deepStrictEqual(Sh.removeArgv(TOOLS, [odd, odd]).slice(3), [odd, odd])
   assert.strictEqual(Sh.purgeArgv(TOOLS, odd)[1], odd)
   assert.strictEqual(Sh.writeArgv(TOOLS, odd).length, 5)
+  assert.strictEqual(Sh.removeTreeArgv(TOOLS, odd)[3], odd)
+  assert.deepStrictEqual(Sh.copyArgv(TOOLS, odd, odd).slice(2), [odd, odd])
+  assert.deepStrictEqual(Sh.signinDirsArgv(TOOLS, odd, odd).slice(4), [odd, odd])
+  assert.deepStrictEqual(Sh.cookieExportArgv(TOOLS, odd, odd, odd).slice(4, 8),
+    [odd, odd + "/profile", odd, odd])
 })

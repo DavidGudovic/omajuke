@@ -1,7 +1,8 @@
 "use strict"
 // Tests for lib/Errors.js: the vector table (also run inside Qt's engine),
 // the wording of every code, the split into "skip this track" and "stop",
-// and the order in which a yt-dlp error line is classified.
+// the order in which a yt-dlp error line is classified, and what counts as
+// a login YouTube no longer accepts.
 var test = require("node:test")
 var assert = require("node:assert")
 var load = require("./load.js")
@@ -33,7 +34,21 @@ var TEXTS = [
   ["E_PLAYBACK", "Playback failed"],
   ["N_PROXY", "A proxy is set for this session. OmaJuke does not use it: its connections go direct. "
     + "Use a system-wide VPN to route them"],
-  ["N_STATE_RESET", "Saved history could not be read and was reset"]
+  ["N_STATE_RESET", "Saved history could not be read and was reset"],
+  ["N_NO_RELATED", "No related tracks found"],
+  ["N_SKIPPED", "Skipped a track that could not be played"],
+  ["E_VIDEO_NONE", "No video for this track"],
+  ["E_HYPR_VERSION", "This Hyprland version is not tested with OmaJuke"],
+  ["E_HYPR_ERRORS", "Fix the errors in your Hyprland config first"],
+  ["E_HYPR_EVAL", "Hyprland refused the request"],
+  ["E_HYPR_NONE", "Hyprland is not available"],
+  ["N_OUTPUT_FALLBACK", "That output is gone. Using the system default"],
+  ["E_SIGNIN_BROWSER", "Sign-in needs Chrome, Chromium, Brave, Vivaldi, Firefox or LibreWolf"],
+  ["E_SIGNIN_CANCELLED", "Sign-in was cancelled"],
+  ["E_SIGNIN_NONE", "No YouTube login was found in that browser window"],
+  ["E_SIGNED_OUT", "YouTube signed this session out. Sign in again"],
+  ["E_SIGNOUT_LEFT", "The saved login could not be deleted"],
+  ["E_FEED", "That list could not be loaded"]
 ]
 var CODES = TEXTS.map(function(row) { return row[0] })
 
@@ -43,10 +58,19 @@ var SKIP = [
 ]
 
 // The network, the tools or YouTube as a whole is the problem: playback
-// stops. The last five never come from playing a track at all.
+// stops. From E_RUNTIME_DIR on, the codes never come from playing a track
+// at all; they are here because nothing may take them for a reason to skip.
 var STOP = [
   "E_NETWORK", "E_STREAM", "E_TIMEOUT", "E_YT_BLOCKED", "E_YTDLP_MISSING", "E_TOOLS_MISSING", "E_MPV_MISSING",
-  "E_MPV_START", "E_MPV_EXITED", "E_RUNTIME_DIR", "E_INVALID_INPUT", "E_LINK", "N_PROXY", "N_STATE_RESET"
+  "E_MPV_START", "E_MPV_EXITED", "E_RUNTIME_DIR", "E_INVALID_INPUT", "E_LINK", "N_PROXY", "N_STATE_RESET",
+  "N_NO_RELATED", "N_SKIPPED", "E_VIDEO_NONE", "E_HYPR_VERSION", "E_HYPR_ERRORS", "E_HYPR_EVAL",
+  "E_HYPR_NONE", "N_OUTPUT_FALLBACK", "E_SIGNIN_BROWSER", "E_SIGNIN_CANCELLED", "E_SIGNIN_NONE",
+  "E_SIGNED_OUT", "E_SIGNOUT_LEFT", "E_FEED"
+]
+
+// What yt-dlp prints when the login it was given no longer counts.
+var SIGNED_OUT = [
+  "cookies are no longer valid", "Sign in to confirm", "login required", "requires authentication"
 ]
 
 // What the runner itself can report about a job, and the code for it.
@@ -92,7 +116,7 @@ function elapsedMs(fn) {
 }
 
 test("exports exactly the documented members", function() {
-  assert.deepStrictEqual(Object.keys(Errors).sort(), ["TEXT", "fromYtDlp", "isSkipClass"])
+  assert.deepStrictEqual(Object.keys(Errors).sort(), ["TEXT", "fromSignedIn", "fromYtDlp", "isSkipClass"])
 })
 
 table.CASES.forEach(function(c, i) {
@@ -102,8 +126,8 @@ table.CASES.forEach(function(c, i) {
   })
 })
 
-test("the table exercises both functions", function() {
-  var names = ["fromYtDlp", "isSkipClass"]
+test("the table exercises every function", function() {
+  var names = ["fromYtDlp", "fromSignedIn", "isSkipClass"]
   names.forEach(function(name) {
     assert.ok(table.CASES.some(function(c) { return c.fn === name }), name)
   })
@@ -146,6 +170,7 @@ test("every sentence is one short plain line in sentence case, without a final f
     assert.ok(/^[\x20-\x7e]{5,130}$/.test(text), code)
     // A capital first, except where the sentence starts with a tool's name.
     assert.ok(/^([A-Z]|yt-dlp |mpv )/.test(text), code)
+    assert.match(code, /^[EN]_[A-Z]+(_[A-Z]+)*$/, code)
     assert.ok(!/[.!]$/.test(text), code)
     assert.strictEqual(text, text.trim(), code)
     assert.ok(text.indexOf("  ") === -1, code)
@@ -289,6 +314,63 @@ test("fromYtDlp never throws and is never slow", function() {
   ]
   hostile.forEach(function(stderr, i) {
     var ms = elapsedMs(function() { Errors.fromYtDlp(job("exit", stderr)) })
+    assert.ok(ms < 1000, "input " + i + " took " + Math.round(ms) + " ms")
+  })
+})
+
+// ---- A login that no longer counts ----
+
+function signedIn(ok, stderr) {
+  return {
+    ok: ok, error: ok ? "" : "exit", exitCode: ok ? 0 : 1, stdout: "{}\n", stderr: stderr, durationMs: 900
+  }
+}
+
+test("each phrase on any line means signed out, whether the job failed or not", function() {
+  SIGNED_OUT.forEach(function(phrase) {
+    var lines = [
+      "WARNING: [youtube] " + phrase + ". Use fresh ones\n",
+      "ERROR: [youtube] AAAAAAAAAAA: " + phrase + "\n",
+      "Reading URLs from STDIN - EOF (Ctrl+D) to end:\nWARNING: other\nWARNING: " + phrase + "\n",
+      phrase.toUpperCase(), phrase.toLowerCase()
+    ]
+    lines.forEach(function(stderr) {
+      assert.strictEqual(Errors.fromSignedIn(signedIn(true, stderr)), "E_SIGNED_OUT", stderr)
+      assert.strictEqual(Errors.fromSignedIn(signedIn(false, stderr)), "E_SIGNED_OUT", stderr)
+    })
+  })
+  assert.strictEqual(typeof Errors.TEXT.E_SIGNED_OUT, "string")
+})
+
+test("anything else leaves the login alone, a failure included", function() {
+  var others = [
+    "", "WARNING: [youtube] Falling back to another player\n", "ERROR: [youtube] AAAAAAAAAAA: Private video\n"
+  ]
+  CLASSES.forEach(function(group) {
+    group.phrases.forEach(function(phrase) { others.push("ERROR: " + phrase + "\n") })
+  })
+  others.forEach(function(stderr) {
+    var expected = SIGNED_OUT.some(function(phrase) {
+      return stderr.toLowerCase().indexOf(phrase.toLowerCase()) !== -1
+    })
+    assert.strictEqual(Errors.fromSignedIn(signedIn(false, stderr)), expected ? "E_SIGNED_OUT" : "", stderr)
+  })
+  // Only stderr is read: the output of a job is the account's own data.
+  assert.strictEqual(Errors.fromSignedIn({ ok: true, stdout: "login required", stderr: "" }), "")
+  assert.strictEqual(Errors.fromSignedIn({ ok: true, error: "login required", stderr: "" }), "")
+})
+
+test("fromSignedIn never throws and is never slow", function() {
+  var odd = [undefined, null, 0, "", "login required", true, [], {}, Object.create(null), function() {},
+    Symbol("s"), { stderr: {} }, { stderr: ["login required"] }, { stderr: Symbol("s") }, { stderr: null }]
+  odd.forEach(function(value, i) {
+    assert.strictEqual(Errors.fromSignedIn(value), "", "value " + i)
+  })
+  var size = 1 << 20
+  var hostile = ["login ".repeat(size / 8), "Sign in to ".repeat(size / 16), "requires ".repeat(size / 16),
+    "cookies are no longer ".repeat(size / 32), "x".repeat(size) + "\nlogin required\n"]
+  hostile.forEach(function(stderr, i) {
+    var ms = elapsedMs(function() { Errors.fromSignedIn(signedIn(false, stderr)) })
     assert.ok(ms < 1000, "input " + i + " took " + Math.round(ms) + " ms")
   })
 })

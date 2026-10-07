@@ -8,7 +8,8 @@
 // It is safe to run on a desktop in use. mpv is started with the plugin's
 // own launch flags plus --ytdl=no --ao=null --vo=null and an environment
 // that names no display and no session bus: no window, no sound, no network.
-// It plays short silent files this script writes into a private temporary
+// It plays short silent files (and, for the video traces, a few seconds of
+// a grey 16x16 picture) this script writes into a private temporary
 // directory, which is removed at the end. mpv is tied to this process by its
 // standard input and goes away with it. The only process this script ever
 // ends is that child, through the handle it was started with.
@@ -17,13 +18,18 @@
 // connection came up:
 //   { t, send: [...] }   a command we wrote. Request ids count the sends of
 //                        a trace from 1. glued: true marks a command that
-//                        left in the same write as the send before it.
+//                        left in the same write as the send before it, and
+//                        async: true one that mpv was asked not to wait for.
 //   { t, recv: {...} }   a line we received. Lines with the same t came in
 //                        the same read.
 //   { t, other: [...] }  a command a second client wrote, which is what a
 //                        media key reaches mpv as. Its replies are not ours
 //                        and are not in the trace.
-// File paths are replaced by <a>, <b>, <c>, <long>, <missing> and <text>.
+// File paths are replaced by <a>, <b>, <c>, <long>, <missing>, <text> and
+// <v>. The list of audio outputs is replaced by a made-up one wherever mpv
+// tells it: the real list names the hardware of the machine this ran on.
+// The name of a track's sample or pixel format is left out of track lists:
+// nothing reads it.
 var childProcess = require("child_process")
 var fs = require("fs")
 var net = require("net")
@@ -48,6 +54,14 @@ var WAIT_MS = 8000
 var QUIET_MS = 150
 var DEADLINE_MS = 180000
 var ATTEMPTS = 20
+
+// What stands in for mpv's list of audio outputs in every trace.
+var OUTPUTS = [
+  { name: "auto", description: "Autoselect device" },
+  { name: "pipewire/stub.speakers", description: "Stub speakers" },
+  { name: "pipewire/stub.headphones", description: "Stub headphones" }
+]
+var OUTPUT_LIST = "audio-device-list"
 
 // The one child of this script and its working directory. Module level, so
 // that the deadline below can end the one and remove the other whatever the
@@ -77,6 +91,26 @@ function silence(seconds) {
   header.write("data", 36, "ascii")
   header.writeUInt32LE(bytes, 40)
   return Buffer.concat([header, Buffer.alloc(bytes)])
+}
+
+// A few seconds of a grey picture as uncompressed video: a text header,
+// then one marked frame after the other. mpv reads it without any encoder
+// having been involved.
+function picture(seconds) {
+  var side = 16
+  var rate = 25
+  var header = Buffer.from("YUV4MPEG2 W" + side + " H" + side + " F" + rate + ":1 Ip A1:1 C420jpeg\n",
+    "ascii")
+  var frame = Buffer.concat([
+    Buffer.from("FRAME\n", "ascii"), Buffer.alloc(side * side, 128), Buffer.alloc(side * side / 2, 128)
+  ])
+  var parts = [header]
+  for (var i = 0; i < seconds * rate; i++) parts.push(frame)
+  return Buffer.concat(parts)
+}
+
+function withoutFormatName(item) {
+  if (item !== null && typeof item === "object") delete item["format-name"]
 }
 
 // No display, no session bus, and a home directory that is ours.
@@ -152,6 +186,7 @@ async function open(dir, names) {
     received: [],
     cursor: 0,
     requests: 0,
+    outputReads: new Set(),
     waiter: null,
     lastLine: 0,
     socket: socket,
@@ -184,6 +219,10 @@ async function open(dir, names) {
     lines.forEach(function(text) {
       if (text === "") return
       var line = scrubbed(JSON.parse(text), names)
+      var aboutOutputs = (line.event === "property-change" && line.name === OUTPUT_LIST)
+        || session.outputReads.has(line.request_id)
+      if (aboutOutputs && Array.isArray(line.data)) line.data = OUTPUTS
+      else if (Array.isArray(line.data)) line.data.forEach(withoutFormatName)
       session.records.push({ t: t, recv: line })
       session.received.push(line)
     })
@@ -191,7 +230,7 @@ async function open(dir, names) {
     session.drain()
   })
 
-  function write(commands) {
+  function write(commands, nonBlocking) {
     var t = session.stamp()
     var text = ""
     var ids = []
@@ -199,9 +238,14 @@ async function open(dir, names) {
       if (!Array.isArray(command)) throw new Error("not a command")
       session.requests++
       ids.push(session.requests)
-      text += JSON.stringify({ command: command, request_id: session.requests }) + "\n"
+      var asksOutputs = command[0] === "get_property" && command[1] === OUTPUT_LIST
+      if (asksOutputs) session.outputReads.add(session.requests)
+      var message = { command: command, request_id: session.requests }
+      if (nonBlocking) message["async"] = true
+      text += JSON.stringify(message) + "\n"
       var record = { t: t, send: scrubbed(command, names) }
       if (i > 0) record.glued = true
+      if (nonBlocking) record.async = true
       session.records.push(record)
     })
     socket.write(text)
@@ -209,10 +253,14 @@ async function open(dir, names) {
   }
 
   // One command in a write of its own. Returns its request id.
-  session.send = function(command) { return write([command])[0] }
+  session.send = function(command) { return write([command], false)[0] }
+
+  // The same for a command mpv is asked not to wait for: it goes on reading
+  // and answers when the command is done.
+  session.sendAsync = function(command) { return write([command], true)[0] }
 
   // Several commands in one write, so that mpv reads them together.
-  session.burst = function(commands) { return write(commands) }
+  session.burst = function(commands) { return write(commands, false) }
 
   // A command from a second client. Whatever mpv answers it is not ours.
   session.other = function(command) {
@@ -295,6 +343,42 @@ function loadCommand(file, mode, start) {
   var options = { "force-media-title": Const.APP_NAME }
   if (start !== undefined) options["start"] = String(start)
   return ["loadfile", file, mode, -1, options]
+}
+
+// The load that puts a file in front of the playlist entry at index.
+function insertCommand(file, index) {
+  return ["loadfile", file, "insert-at", index, { "force-media-title": Const.APP_NAME }]
+}
+
+// The video commands in the shape the plugin sends them. The address
+// differs: the plugin adds a stream, the traces a local file.
+function addCommand(file) {
+  return ["video-add", file, "auto"]
+}
+
+async function answered(s, id) {
+  return await s.until(isReply(id), "the reply to request " + id)
+}
+
+// What showing the video of the current file takes: the three observations,
+// the window, the request size, the track, its selection. Returns the reply
+// to the question about the tracks that was asked after the track was added.
+async function showVideo(s, file) {
+  var watched = ["vid", "track-list", "video-params"]
+  watched.forEach(function(name) { s.send(MpvProto.observe(name)) })
+  s.send(MpvProto.setForceWindow(true))
+  await answered(s, s.send(MpvProto.getProperty("track-list")))
+  s.send(MpvProto.streamRequestSize())
+  await answered(s, s.sendAsync(addCommand(file)))
+  var tracks = await answered(s, s.send(MpvProto.getProperty("track-list")))
+  var ids = MpvProto.videoTracks(tracks.data)
+  s.send(MpvProto.setVid(ids[ids.length - 1], ids))
+  await s.until(function(line) {
+    return line.event === "property-change" && line.name === "video-params" && MpvProto.hasPicture(line.data)
+  }, "a picture")
+  s.send(MpvProto.setStopScreensaver(true))
+  await s.quiet()
+  return tracks
 }
 
 // What the player sends on a fresh connection, each in a write of its own.
@@ -586,6 +670,162 @@ var SCENARIOS = {
     await untilIdle(s)
   },
 
+  // The queue window: neighbours are appended and inserted, one that is no
+  // longer wanted is removed, and a held entry is started by its position.
+  playlist_edit: async function(s, m) {
+    await ready(s)
+    await play(s, m.long)
+    s.send(loadCommand(m.b, "append-play"))
+    s.send(loadCommand(m.c, "append-play"))
+    await s.quiet()
+    s.send(insertCommand(m.a, 0))
+    await s.quiet()
+    s.send(MpvProto.getProperty("playlist"))
+    await s.quiet()
+    s.send(MpvProto.playlistRemove(3, 4))
+    await s.quiet()
+    // Not a command of the plugin: another program can send it.
+    s.send(["playlist-play-index", 2])
+    await s.until(isEvent("playback-restart"), "playback-restart")
+    await s.quiet()
+    s.send(MpvProto.playlistRemove(0, 3))
+    await s.quiet()
+    s.send(MpvProto.getProperty("playlist"))
+    await s.quiet()
+  },
+
+  // Two removes and a load in one write, the way a new plan for the queue
+  // window leaves: where the reports about the playlist fall between the
+  // answers decides what a position may be worked out from.
+  playlist_burst: async function(s, m) {
+    await ready(s)
+    await play(s, m.long)
+    s.burst([loadCommand(m.a, "append-play"), loadCommand(m.b, "append-play")])
+    await s.quiet()
+    s.burst([MpvProto.playlistRemove(2, 3), MpvProto.playlistRemove(1, 2), loadCommand(m.c, "append-play")])
+    await s.quiet()
+  },
+
+  // Removing the entry that plays ends it and starts the one behind it.
+  playlist_remove_current: async function(s, m) {
+    await ready(s)
+    await play(s, m.long)
+    s.send(loadCommand(m.b, "append-play"))
+    await s.quiet()
+    s.send(MpvProto.playlistRemove(0, 2))
+    await s.until(isEvent("playback-restart"), "playback-restart")
+    await s.quiet()
+  },
+
+  playlist_clear: async function(s, m) {
+    await ready(s)
+    await play(s, m.long)
+    s.send(loadCommand(m.b, "append-play"))
+    s.send(insertCommand(m.c, 0))
+    await s.quiet()
+    // Not a command of the plugin either.
+    s.send(["playlist-clear"])
+    await s.quiet()
+    s.send(MpvProto.getProperty("playlist"))
+    await s.quiet()
+  },
+
+  // A position behind the end of the playlist: mpv says "success" and stops
+  // playing, which is why the plugin never sends one.
+  play_index_past_end: async function(s, m) {
+    await ready(s)
+    await play(s, m.long)
+    s.send(["playlist-play-index", 5])
+    await untilIdle(s)
+  },
+
+  // Video beside the audio that already plays, then hidden again.
+  video_show_hide: async function(s, m) {
+    await ready(s)
+    await play(s, m.long)
+    await showVideo(s, m.v)
+    s.send(MpvProto.setVid(0, []))
+    s.send(MpvProto.setForceWindow(false))
+    s.send(MpvProto.setStopScreensaver(false))
+    var watched = ["vid", "track-list", "video-params"]
+    watched.forEach(function(name) { s.send(MpvProto.unobserve(name)) })
+    await s.quiet()
+  },
+
+  // The file changes while video is shown: the next file has no video until
+  // one is added to it as well.
+  video_track_change: async function(s, m) {
+    await ready(s)
+    await play(s, m.long)
+    await showVideo(s, m.v)
+    await play(s, m.b)
+    s.send(MpvProto.getProperty("track-list"))
+    await s.quiet()
+    await showVideo(s, m.v)
+  },
+
+  // Shown, hidden and shown again on the same file: the track is still
+  // there and only has to be selected.
+  video_show_again: async function(s, m) {
+    await ready(s)
+    await play(s, m.long)
+    var tracks = MpvProto.videoTracks((await showVideo(s, m.v)).data)
+    s.send(MpvProto.setVid(0, []))
+    s.send(MpvProto.setForceWindow(false))
+    await s.quiet()
+    s.send(MpvProto.setForceWindow(true))
+    await answered(s, s.send(MpvProto.getProperty("track-list")))
+    s.send(MpvProto.setVid(tracks[tracks.length - 1], tracks))
+    await s.until(isChange("vid"), "the selection")
+    await s.quiet()
+  },
+
+  // The window's close request, which is what the compositor's close key
+  // sends: with the binding of the handshake it hides the video and tells
+  // us, and mpv plays on.
+  video_closed: async function(s, m) {
+    await ready(s)
+    await s.openSecond()
+    await play(s, m.long)
+    await showVideo(s, m.v)
+    s.other(["keypress", "CLOSE_WIN"])
+    await s.until(isEvent("client-message"), "the message")
+    await s.quiet()
+    s.send(MpvProto.setForceWindow(false))
+    s.send(MpvProto.getProperty("time-pos"))
+    await s.quiet()
+  },
+
+  // A video that cannot be opened: the answer is an error and the audio
+  // plays on.
+  video_add_fails: async function(s, m) {
+    await ready(s)
+    await play(s, m.long)
+    s.send(MpvProto.streamRequestSize())
+    await answered(s, s.sendAsync(addCommand(m.missing)))
+    s.send(MpvProto.getProperty("track-list"))
+    s.send(MpvProto.getProperty("time-pos"))
+    await s.quiet()
+  },
+
+  // The outputs: watched, asked for, and one selected, before anything
+  // plays. An mpv that cannot reach a sound server now and then never
+  // answers the question; that attempt is given up and made again.
+  output_select: async function(s, m) {
+    handshake(s)
+    s.send(MpvProto.observe("audio-device-list"))
+    s.send(MpvProto.observe("audio-device"))
+    try {
+      await answered(s, s.send(MpvProto.getProperty("audio-device-list")))
+    } catch (error) {
+      return false
+    }
+    s.send(MpvProto.setAudioDevice("auto", OUTPUTS))
+    s.send(loadCommand(m.a, "replace"))
+    await s.until(isEvent("playback-restart"), "playback-restart")
+    await s.quiet()
+  },
+
   // Another client's load arrives right behind ours. Ours gets its reply
   // and nothing else: mpv starts only the last of the two.
   lost_load: async function(s, m) {
@@ -655,13 +895,15 @@ async function main() {
       c: path.join(dir, "c.wav"),
       long: path.join(dir, "long.wav"),
       missing: path.join(dir, "missing.wav"),
-      text: path.join(dir, "text.wav")
+      text: path.join(dir, "text.wav"),
+      v: path.join(dir, "v.y4m")
     }
     fs.writeFileSync(media.a, silence(SECONDS))
     fs.writeFileSync(media.b, silence(SECONDS))
     fs.writeFileSync(media.c, silence(SECONDS))
     fs.writeFileSync(media.long, silence(LONG_SECONDS))
     fs.writeFileSync(media.text, "This is not media.\n".repeat(64))
+    fs.writeFileSync(media.v, picture(LONG_SECONDS))
     // Longest first: the directory is a prefix of every file in it.
     var names = Object.keys(media).map(function(key) { return [media[key], "<" + key + ">"] })
     names.push([dir, "<dir>"])
@@ -686,7 +928,7 @@ async function main() {
   }
 }
 
-// The recording takes about half a minute. If something hangs, the child is
+// The recording takes about a minute. If something hangs, the child is
 // ended through its handle and nothing is written.
 var deadline = setTimeout(function() {
   process.stderr.write("record-traces: gave up\n")

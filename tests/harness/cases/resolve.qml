@@ -1,6 +1,7 @@
 import QtQuick
 import "../../../lib/Const.js" as Const
 import "../../../lib/Env.js" as Env
+import "../../../lib/Errors.js" as Errors
 import "../../../lib/Sh.js" as Sh
 
 // core/Resolver.qml against the yt-dlp stub and the real file tools: the
@@ -49,6 +50,7 @@ QtObject {
       root.overtaken,
       root.joined, root.failures, root.noAnswer, root.badRequests, root.noYtDlp, root.writeFails,
       root.expired, root.retained, root.neverNamed, root.purged, root.purgedWhileLooking, root.largest,
+      root.pictureAddress, root.pictureBesideAPlay, root.accountReady, root.withAccount, root.accountRefused,
       root.quiet
     ]
     root.next()
@@ -529,8 +531,9 @@ QtObject {
       root.resolver.ensure(notIds[i], "play", note)
       root.resolver.refresh(notIds[i], note)
     }
-    // A lookup ahead of a play does not exist yet.
-    var purposes = ["next", "preload", "", undefined, null, "PLAY", 1]
+    // A purpose that does not exist, and a lookup for a rested highlight
+    // while the setting for it is off.
+    var purposes = ["preload", "Next", "", undefined, null, "PLAY", 1]
     for (var k = 0; k < purposes.length; k++) root.resolver.ensure(root.vid("I"), purposes[k], note)
     // A request without a callback is still a request.
     root.resolver.ensure("short", "play")
@@ -770,6 +773,343 @@ QtObject {
     })
   }
 
+  // ---- The address of the picture ----
+
+  function askPicture(label, id, then) {
+    var h = root.h
+    var returned = false
+    var answers = 0
+    root.resolver.refreshVideoUrl(id, function(result) {
+      answers += 1
+      h.check(returned && answers === 1, label + ": answered once, after the request returned")
+      h.equal(Object.keys(result), ["ok", "code", "videoUrl"], label + ": the keys of the answer")
+      then(result)
+    })
+    returned = true
+  }
+
+  // A track that keeps playing gets a new address for its picture, and
+  // nothing else about its entry changes: mpv's playlist still names the
+  // file, so no file is written and none is deleted.
+  function pictureAddress() {
+    var h = root.h
+    var id = root.vid("T")
+    var moved = root.videoUrl.replace("rr1---", "rr2---")
+    h.scenario({ ytdlp: "ok" })
+    root.askPicture("picture, no entry", id, function(none) {
+      h.equal([none.ok, none.code, none.videoUrl], [false, "E_VIDEO_NONE", ""], "picture: no entry, none")
+      root.lookUp("picture", id, 18, function(made) {
+        var old = made.entry
+        var before = [root.starts(), h.jobs().length]
+        h.scenario({ ytdlp: "moved" })
+        root.askPicture("picture", id, function(result) {
+          h.equal([result.ok, result.code, result.videoUrl], [true, "", moved], "picture: the new address")
+          var entry = root.resolver.entry(id)
+          h.equal([entry.n, entry.file, entry.resolvedAt, entry.videoUrl],
+            [18, root.infoFile(18), old.resolvedAt, moved], "picture: the entry keeps file, counter and age")
+          h.check(entry.track === old.track && Object.isFrozen(entry), "picture: and its track")
+          h.equal(h.log("ytdlp")[before[0]].argv, root.flags(720), "picture: the signed-out lookup")
+          h.scenario({ ytdlp: "refused" })
+          root.askPicture("picture refused", id, function(refused) {
+            h.equal([refused.ok, refused.code, refused.videoUrl], [false, "E_YT_REFUSED", ""],
+              "picture: the code of a failure")
+            h.check(root.resolver.entry(id) === entry, "picture: a failure changes nothing")
+            root.settled(function() {
+              var tags = h.jobs().slice(before[1]).map(function(job) { return job.tag })
+              h.equal(tags, ["resolve", "resolve"], "picture: nothing was written or removed")
+              var fixture = h.readFile(h.repo + "/tests/fixtures/video.json").split(root.fixtureId).join(id)
+              h.check(h.readFile(root.infoFile(18)) === fixture, "picture: the file of the play is as it was")
+              root.listing(function(found) {
+                h.equal(found, root.files([18]), "picture: one file, as before")
+                var bad = []
+                root.resolver.refreshVideoUrl("short", function(answer) { bad.push(answer) })
+                root.resolver.refreshVideoUrl(null)
+                h.after(100, function() {
+                  h.equal(bad, [{ ok: false, code: "E_INVALID_INPUT", videoUrl: "" }], "picture: not an id")
+                  root.next()
+                })
+              })
+            })
+          })
+        })
+      })
+    })
+  }
+
+  // A play always comes first. A request for the picture never ends the
+  // lookup of a play: it shares the one for its own track and gives way to
+  // one for another. A play, or playback stopping, ends it.
+  function pictureBesideAPlay() {
+    var h = root.h
+    var id = root.vid("T")
+    var other = root.vid("U")
+    var before = root.starts()
+    var pictures = []
+    var note = function(result) { pictures.push(result.code === "" ? result.videoUrl : result.code) }
+    h.scenario({ ytdlp: "slow:800" })
+    root.ask("picture beside a play", "ensure", other, function(played) {
+      h.equal([played.ok, played.code], [true, ""], "picture beside a play: the play went on")
+      h.equal(pictures, ["cancelled"], "picture beside a play: the picture gave way")
+      root.ask("picture with its play", "refresh", id, function(again) {
+        h.check(again.ok, "picture with its play: looked up again")
+        h.equal(root.starts() - before, 2, "picture with its play: two lookups for three requests")
+        h.scenario({ ytdlp: "slow:3000" })
+        root.resolver.refreshVideoUrl(id, note)
+        h.waitFor(function() { return root.starts() === before + 3 }, 5000, function() {
+          // The play was told first, the picture right behind it.
+          h.equal(pictures, ["cancelled", root.videoUrl], "picture with its play: shared the lookup")
+          root.resolver.cancelPlay()
+          root.resolver.refreshVideoUrl(id, note)
+          h.waitFor(function() { return root.starts() === before + 4 }, 5000, function() {
+            h.scenario({ ytdlp: "ok" })
+            root.ask("a play ends a picture", "ensure", root.vid("V"), function(played2) {
+              h.check(played2.ok, "a play ends a picture: the play is looked up")
+              h.equal(pictures.slice(2), ["cancelled", "cancelled"],
+                "a play ends a picture: stopped by playback, then by a play")
+              root.resolver.purge([])
+              root.settled(function() { root.next() })
+            })
+          })
+        })
+      })
+      root.resolver.refreshVideoUrl(id, note)
+    })
+    root.resolver.refreshVideoUrl(id, note)
+  }
+
+  // ---- With the account ----
+
+  readonly property string jarRows: "# Netscape HTTP Cookie File\n\n"
+    + "#HttpOnly_.youtube.com\tTRUE\t/\tTRUE\t1893456000\tLOGIN_INFO\tinvented-login\n"
+    + ".youtube.com\tTRUE\t/\tTRUE\t1893456000\tSAPISID\tinvented-key\n"
+
+  // What the keeper stands in for was asked to do, and how it is told to
+  // behave: the requests it got, the tickets it was asked to give up, and
+  // whether it refuses calls or leaves the verdict on the login to others.
+  property var requests: []
+  property var tickets: []
+  property var keeperJob: null
+  property bool refusing: false
+  property bool silent: false
+  // It takes the call and then finds that it cannot run it.
+  property bool stuck: false
+
+  function copyFile(n) {
+    return root.fs.paths.jarDir + "/" + n + ".txt"
+  }
+
+  function accountFlags(n) {
+    var flags = root.flags(720)
+    return flags.slice(0, 11).concat(["--cookies", root.copyFile(n)], flags.slice(13))
+  }
+
+  // Stands in for the keeper of the saved login, with the two functions the
+  // resolver uses. Like the real one it copies the login, runs what the
+  // request builds for the copy under the private umask, removes the copy
+  // and only then tells, with its verdict on the login.
+  function runSigned(request) {
+    root.requests.push(request)
+    var gone = { ok: false, error: "refused", exitCode: -1, stdout: "", stderr: "", durationMs: 0 }
+    if (root.refusing) {
+      root.h.after(0, function() { request.done(gone, "") })
+      return 0
+    }
+    var ticket = root.requests.length
+    if (root.stuck) {
+      root.h.after(0, function() { request.done(gone, "") })
+      return ticket
+    }
+    var copy = root.copyFile(ticket)
+    var entry = { ticket: ticket, job: 0 }
+    root.keeperJob = entry
+    // A call that shows the login is no longer accepted is told by its
+    // code, with nothing of its output.
+    var tell = function(result) {
+      var code = root.silent ? "" : Errors.fromSignedIn(result)
+      var blank = { ok: false, error: "signed-out", exitCode: -1, stdout: "", stderr: "", durationMs: 0 }
+      root.fs.remove([copy], function() { request.done(code === "" ? result : blank, code) })
+    }
+    root.fs.copyJar(ticket, function(copied) {
+      if (!copied.ok) { tell(copied); return }
+      entry.job = root.runner.run({
+        tag: request.tag, argv: request.build(copy), stdin: request.stdin, timeoutSec: request.timeoutSec,
+        maxBytes: request.maxBytes, env: Env.net(root.fs.paths), umask077: true, done: tell
+      })
+    })
+    return ticket
+  }
+
+  function cancelSigned(ticket) {
+    root.tickets.push(ticket)
+    var entry = root.keeperJob
+    if (entry !== null && entry.ticket === ticket && entry.job !== 0) root.runner.cancel(entry.job)
+  }
+
+  // then(lines): "<mode> <name>" for everything in the folder of copies,
+  // and the mode and text of the saved login.
+  function jarState(then) {
+    var paths = root.fs.paths
+    var find = ["/usr/bin/find", paths.jarDir, "-mindepth", "1", "-printf", "%m %f\n"]
+    root.h.exec(find, null, function(code, out) {
+      root.h.exec(["/usr/bin/stat", "-c", "%a", paths.jarFile], null, function(status, mode) {
+        var saved = status === 0 ? root.h.readFile(paths.jarFile) : ""
+        then(out.split("\n").filter(function(line) { return line !== "" }), mode.trim(), saved)
+      })
+    })
+  }
+
+  // A saved login for the steps below: made-up rows, private. Until someone
+  // keeps it, nothing can be asked with the account.
+  function accountReady() {
+    var h = root.h
+    var paths = root.fs.paths
+    root.fs.prepareData(function(result) {
+      h.check(result.ok, "account: the data folder is there")
+      h.writeFile(paths.jarFile, root.jarRows)
+      h.exec(["/usr/bin/chmod", "600", paths.jarFile], null, function() {
+        var before = [root.starts(), h.jobs().length]
+        var answers = []
+        var note = function(answer) { answers.push(answer.code) }
+        var keepers = [null, undefined, {}, { runSigned: "no function" }]
+        for (var i = 0; i < keepers.length; i++) {
+          root.resolver.account = keepers[i]
+          root.resolver.refreshWithAccount(root.vid("W"), note)
+        }
+        root.resolver.account = { runSigned: root.runSigned, cancelSigned: root.cancelSigned }
+        root.resolver.refreshWithAccount("short", note)
+        root.resolver.refreshWithAccount(null)
+        h.after(200, function() {
+          var none = "E_SIGNED_OUT"
+          h.equal(answers, [none, none, none, none, "E_INVALID_INPUT"],
+            "account: nothing is asked while nobody keeps a login, or without an id")
+          h.equal([root.starts(), h.jobs().length, root.requests.length], [before[0], before[1], 0],
+            "account: and no job")
+          root.next()
+        })
+      })
+    })
+  }
+
+  // YouTube refuses a video to a visitor. Asked again with the account, it
+  // is looked up by the keeper of the login with a copy of it: the command
+  // the resolver builds names the copy it is handed, and no command is
+  // built for the saved login itself or for any other file.
+  function withAccount() {
+    var h = root.h
+    var id = root.vid("W")
+    var paths = root.fs.paths
+    var before = [root.starts(), h.jobs().length]
+    h.scenario({ ytdlp: "restricted" })
+    root.ask("visitor", "ensure", id, function(refused) {
+      root.failed("visitor: the video needs an account", refused, "E_NEEDS_ACCOUNT")
+      var returned = false
+      root.resolver.refreshWithAccount(id, function(result) {
+        h.check(returned, "with the account: answered after the request returned")
+        h.equal([result.ok, result.code, result.cached], [true, "", false], "with the account: looked up")
+        h.equal([result.entry.id, result.entry.file], [id, root.infoFile(result.entry.n)],
+          "with the account: an entry like any other")
+        h.check(root.resolver.entry(id) === result.entry, "with the account: and it is kept")
+        var request = root.requests[0]
+        h.equal([root.requests.length, request.tag, request.stdin, request.timeoutSec, request.maxBytes],
+          [1, "resolve", "https://www.youtube.com/watch?v=" + id + "\n", 25, 4194304],
+          "with the account: one call, bounded like every lookup, the address on stdin")
+        h.equal(request.build(root.copyFile(9)), [h.tools.ytdlp].concat(root.accountFlags(9)),
+          "with the account: the command names the copy it is handed")
+        var others = [paths.jarFile, paths.jarDir + "/cookies.txt", root.infoFile(1), "/etc/passwd", "", null]
+        var built = others.filter(function(file) { return request.build(file) !== null })
+        h.equal(built, [], "with the account: no command for the saved login or any other file")
+        var records = h.log("ytdlp").slice(before[0])
+        h.equal(records.length, 2, "with the account: one lookup as a visitor, one signed in")
+        h.equal([records[0].argv, records[0].jar], [root.flags(720), undefined], "visitor: no cookie file")
+        h.equal(records[1].argv, root.accountFlags(1), "with the account: the copy in place of the pair")
+        h.equal(records[1].jar, { found: true, mode: "600", login: true },
+          "with the account: yt-dlp found a private copy that holds the login")
+        root.settled(function() {
+          h.equal(h.jobs().slice(before[1]).map(function(job) { return job.tag }),
+            ["resolve", "jar-copy", "resolve", "remove", "write"], "with the account: the jobs, in order")
+          root.jarState(function(copies, mode, saved) {
+            h.equal([copies, mode, saved === root.jarRows], [[], "600", true],
+              "with the account: no copy is left, and the saved login is untouched")
+            root.whileItRuns()
+          })
+        })
+      })
+      returned = true
+    })
+  }
+
+  // Playback stopping gives the call up at the keeper of the login, and the
+  // caller hears "cancelled" whatever the call still says.
+  function whileItRuns() {
+    var h = root.h
+    var id = root.vid("X")
+    var before = root.starts()
+    var answers = []
+    h.scenario({ ytdlp: "slow:3000" })
+    root.resolver.refreshWithAccount(id, function(result) { answers.push(result.code) })
+    h.waitFor(function() { return root.starts() === before + 1 }, 5000, function(started) {
+      h.check(started, "while it runs: yt-dlp is running")
+      var since = Date.now()
+      root.resolver.cancelPlay()
+      h.equal(root.tickets, [2], "while it runs: the call is given up by its ticket")
+      root.settled(function() {
+        h.check(Date.now() - since < 2000, "while it runs: yt-dlp was ended, not waited for")
+        h.equal([answers, root.resolver.entry(id)], [["cancelled"], null], "while it runs: given up")
+        root.jarState(function(left) {
+          h.equal(left, [], "while it runs: the copy went with the call")
+          root.next()
+        })
+      })
+    })
+  }
+
+  // YouTube no longer accepts the login: yt-dlp says so in a warning and
+  // answers all the same. That answer is not used, whether the keeper of
+  // the login noticed or not. A call the keeper does not take is not made.
+  function accountRefused() {
+    var h = root.h
+    var id = root.vid("Y")
+    var before = root.starts()
+    var codes = []
+    h.scenario({ ytdlp: "signed-out" })
+    root.resolver.refreshWithAccount(id, function(result) {
+      root.failed("signed out: the answer is not used", result, "E_SIGNED_OUT")
+      root.silent = true
+      root.resolver.refreshWithAccount(id, function(again) {
+        root.failed("signed out, unnoticed: the answer is still not used", again, "E_SIGNED_OUT")
+        root.silent = false
+        h.equal(root.starts() - before, 2, "signed out: yt-dlp was asked both times")
+        root.refusing = true
+        h.scenario({ ytdlp: "ok" })
+        root.resolver.refreshWithAccount(id, function(none) {
+          codes.push(none.code)
+          h.after(200, function() {
+            h.equal(codes, ["E_SIGNED_OUT"], "not taken: answered once, as signed out")
+            h.equal([root.starts() - before, root.resolver.entry(id)], [2, null], "not taken: nothing asked")
+            root.refusing = false
+            root.stuck = true
+            root.resolver.refreshWithAccount(id, function(unrun) {
+              root.stuck = false
+              root.failed("taken and not run: not the video's fault", unrun, "E_RUNTIME_DIR")
+            })
+            root.settled(function() {
+              root.jarState(function(copies) {
+                h.equal(copies, [], "signed out: no copy is left")
+                var withJar = h.log("ytdlp").filter(function(record) { return record.jar !== undefined })
+                h.equal(withJar.length, 4, "only the lookups asked for with the account were given a login")
+                root.listing(function(found) {
+                  h.equal(found.length, 1, "one info file: the one the account lookup made")
+                  root.resolver.purge([])
+                  root.settled(function() { root.next() })
+                })
+              })
+            })
+          })
+        })
+      })
+    })
+  }
+
   // Nothing of a lookup may reach the log: no id, no address, and not what
   // the tool printed.
   function quiet() {
@@ -780,7 +1120,11 @@ QtObject {
       var log = h.readFile(h.runDir + "/out.txt")
       var named = root.asked.filter(function(id) { return log.indexOf(id) !== -1 })
       h.equal(named, [], "quiet: no id is in the log")
-      var printed = ["watch?v=", "googlevideo", "ERROR: [youtube]", "Private video", "Reading URLs", "vid=1"]
+      var printed = [
+        "watch?v=", "googlevideo", "ERROR: [youtube]", "Private video", "Reading URLs", "vid=1", "WARNING",
+        "no longer valid", "LOGIN_INFO", "invented"
+      ]
+      h.check(JSON.stringify(h.jobs()).indexOf("invented") === -1, "quiet: no cookie is in any command")
       for (var i = 0; i < printed.length; i++) {
         h.check(log.indexOf(printed[i]) === -1, "quiet: the log holds nothing of a lookup (" + i + ")")
       }

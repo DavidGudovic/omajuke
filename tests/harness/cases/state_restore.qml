@@ -23,6 +23,14 @@ QtObject {
     id: "AAAAAAAAAAA", title: "A,vid=1 \"q\"", channel: "c", duration: 5, live: false
   })
 
+  // Related tracks are another case's subject. Here the user has switched
+  // them off, so a queue ends where the user's own tracks end.
+  function setup(h, done) {
+    var entry = { id: h.manifest.id, autoplay: false }
+    h.shell.barConfig = { position: "top", layout: { left: [], center: [], right: [entry] } }
+    done()
+  }
+
   function run(h) {
     root.h = h
     h.scenario({ ytdlp: "ok", mpv: "ok" })

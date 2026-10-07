@@ -4,7 +4,9 @@ import "../../../lib/Const.js" as Const
 // The playback state machine of core/Playback.qml, row by row, against a
 // scripted player and a scripted resolver: every way playback begins, what
 // each report of the player does in each state, each answer to a failed
-// track, and what is handed to the state store. Nothing here runs a
+// track, what is handed to the state store, and the rows a queue adds: the
+// end of a track with another one behind it, a skipped track, and the
+// part of the queue that mpv is given to hold. Nothing here runs a
 // process or waits for one, so the case is a plain sequence of steps and
 // assertions.
 QtObject {
@@ -31,7 +33,9 @@ QtObject {
       root.liveStream, root.stopping, root.playerIdle, root.playerExited, root.playerFailed,
       root.pauseAndResume, root.resumeAfterLongPause, root.retryFromError, root.superseding,
       root.newTrackWhilePlaying, root.seeking, root.recentTracks, root.savedLists, root.historyOff,
-      root.restoring, root.clearing
+      root.restoring, root.clearing, root.endOfTrackInAQueue, root.skippedLookupOntoAHeldEntry,
+      root.skippedInsideMpv, root.startRequestSparesWhatPlays, root.windowWaitsForMpv, root.lookingAhead,
+      root.withTheAccount
     ]
     for (var i = 0; i < rows.length; i++) rows[i]()
     root.quietLog()
@@ -347,11 +351,13 @@ QtObject {
   }
 
   // A queue of two, as a saved queue brings it back, with the first item
-  // playing from a lookup made for this very attempt.
+  // playing from a lookup made for this very attempt. The second has been
+  // looked up before, so that its start asks for nothing.
   function twoItems(r) {
     var b = root.track(root.idB)
     b.auto = true
     r.playback.restore({ recents: [], queue: { items: [root.track(root.idA), b], index: 0 } })
+    r.resolver.seed(root.idB)
     var keys = [r.playback.queue[0].key, r.playback.queue[1].key]
     root.h.check(r.playback.playPause(), "set-up: the restored item starts")
     r.resolver.succeed()
@@ -370,7 +376,8 @@ QtObject {
     h.equal(root.shown(r), ["loading", "", 1], "followed: loading, on the item with that key")
     h.equal([r.playback.current.id, r.playback.current.auto], [root.idB, true], "followed: it is current")
     h.equal(r.player.calls, [], "followed: no shutdown, no stop, no load")
-    h.equal(r.resolver.calls, [{ name: "retain", args: [[root.idB]] }], "followed: no lookup")
+    h.equal(r.resolver.calls, [{ name: "retain", args: [[root.idA, root.idB]] }],
+      "followed: no lookup, and the item before it is still needed")
     h.equal(r.events, ["ended " + keys[0]], "followed: the track before it has ended")
     h.equal(r.patches[r.patches.length - 1].queue.index, 1,
       "followed: the new position is handed to the store")
@@ -1505,5 +1512,300 @@ QtObject {
     idle.playback.clearHistory()
     h.equal([idle.playback.queue, idle.playback.recents, root.shown(idle)], [[], [], ["idle", "", -1]],
       "clear: with nothing current, both lists are empty")
+  }
+
+  // ---- Rows: a queue ----
+
+  // A queue of three with the first item playing, mpv holding it and the
+  // item after it, and everything said so far forgotten.
+  function threeItems(r) {
+    var ids = [root.idA, root.idB, root.idC]
+    for (var i = 0; i < ids.length; i++) r.playback.enqueueTrack(root.track(ids[i]))
+    var keys = r.playback.queue.map(function(item) { return item.key })
+    root.carry(r)
+    root.quiet(r)
+    return keys
+  }
+
+  // Plays the parts of the lookup and of mpv for the current item: the
+  // lookup answers, mpv reports its playlist, opens the file and plays it,
+  // and whatever is looked up or reported after that happens too.
+  function carry(r) {
+    var item = r.playback.current
+    r.resolver.succeedFor(item.id)
+    r.player.report()
+    root.h.check(r.player.open(item.key), "set-up: mpv holds the entry it opens")
+    root.begin(r, item.key)
+    for (var i = 0; i < 3; i++) {
+      while (r.resolver.pending() > 0) r.resolver.succeed()
+      r.player.report()
+    }
+  }
+
+  function removedKeys(r) {
+    return r.player.calls.filter(function(call) { return call.name === "removeKey" }).map(function(call) {
+      return call.args[0]
+    })
+  }
+
+  function endOfTrackInAQueue() {
+    var h = root.h
+    var r = root.rig()
+    var keys = root.threeItems(r)
+    h.equal([r.player.holds(keys[1]), r.player.playlist()], [true, [keys[0], keys[1]]],
+      "end, queued: set-up, mpv holds the next entry")
+    r.player.ended(keys[0], "eof", "")
+    h.equal([root.shown(r), r.player.calls, r.resolver.calls, r.events], [["playing", "", 0], [], [], []],
+      "end, queued: with the next entry held, nothing is done")
+    r.player.open(keys[1])
+    h.equal([root.shown(r), r.events], [["loading", "", 1], ["ended " + keys[0]]],
+      "end, queued: mpv's own start of the next entry moves the queue on")
+
+    // The next item is not in mpv's playlist: its lookup has not answered.
+    var late = root.rig()
+    late.playback.enqueueTrack(root.track(root.idA))
+    late.playback.enqueueTrack(root.track(root.idB))
+    var lateKeys = late.playback.queue.map(function(item) { return item.key })
+    late.resolver.succeedFor(root.idA)
+    late.player.report()
+    late.player.open(lateKeys[0])
+    root.begin(late, lateKeys[0])
+    root.quiet(late)
+    late.player.ended(lateKeys[0], "eof", "")
+    h.equal(root.shown(late), ["resolving", "", 1],
+      "end, queued: an entry mpv does not hold gets a start request")
+    h.equal([late.player.calls, late.resolver.calls.filter(function(call) { return call.name !== "retain" })],
+      [[], [{ name: "ensure", args: [root.idB, "play"] }]], "end, queued: a lookup for playing, no shutdown")
+    late.player.idle()
+    h.equal(root.shown(late), ["resolving", "", 1], "end, queued: mpv's idle in between is not a stop")
+    h.equal(late.events, ["ended " + lateKeys[0]], "end, queued: the track that ended is announced as ended")
+  }
+
+  // A lookup fails because of the track, and the item after it is one mpv
+  // holds: the track that still plays. No file failed inside mpv, so mpv
+  // starts nothing by itself; waiting for it would never end.
+  function skippedLookupOntoAHeldEntry() {
+    var h = root.h
+    var r = root.rig()
+    var keys = root.threeItems(r)
+    r.playback.next()
+    root.carry(r)
+    h.equal([root.shown(r), r.player.playlist()], [["playing", "", 1], keys], "skip, lookup: set-up")
+    r.player.position = 1
+    r.playback.previous()
+    root.quiet(r)
+    h.equal(r.player.holds(keys[1]), true, "skip, lookup: mpv holds the item after the one asked for")
+    r.resolver.failFor(root.idA, "E_YT_REFUSED")
+    h.equal([root.shown(r), r.playback.noticeCode], [["resolving", "", 1], "N_SKIPPED"],
+      "skip, lookup: a start request for the next item, never a wait")
+    h.equal(r.resolver.calls.filter(function(call) { return call.name !== "retain" }),
+      [{ name: "ensure", args: [root.idB, "play"] }], "skip, lookup: with a lookup")
+    h.equal(r.player.calls, [], "skip, lookup: and the player left alone until it answers")
+    r.resolver.succeedFor(root.idB)
+    h.equal([root.shown(r), root.lastLoad(r)[0], root.lastLoad(r)[4].mode],
+      [["loading", "", 1], keys[1], "replace"],
+      "skip, lookup: then a replacing load of it")
+  }
+
+  // A file fails inside mpv for good, for a reason of its own, while mpv
+  // holds the next entry: mpv is on its way there already.
+  function skippedInsideMpv() {
+    var h = root.h
+    var failTwice = function(r, keys) {
+      r.player.position = 50
+      r.player.ended(keys[0], "error", "decoder failed")
+      root.carry(r)
+      root.quiet(r)
+      r.player.position = 55
+      r.player.ended(keys[0], "error", "decoder failed")
+    }
+    var r = root.rig()
+    var keys = root.threeItems(r)
+    failTwice(r, keys)
+    h.equal([root.shown(r), r.playback.noticeCode], [["loading", "", 0], "N_SKIPPED"],
+      "skip, in mpv: loading, with the notice")
+    h.equal([r.player.calls, r.resolver.calls], [[], []], "skip, in mpv: nothing is called")
+    h.equal(r.events, ["ended " + keys[0]], "skip, in mpv: the failed track has ended")
+    r.player.loading(keys[1])
+    h.equal(root.shown(r), ["loading", "", 1],
+      "skip, in mpv: mpv's start of the next entry moves the queue on")
+    root.begin(r, keys[1])
+    h.equal(root.shown(r), ["playing", "", 1], "skip, in mpv: which then plays")
+
+    var idle = root.rig()
+    var idleKeys = root.threeItems(idle)
+    failTwice(idle, idleKeys)
+    idle.player.idle()
+    h.equal([root.shown(idle), idle.player.names()], [["idle", "", -1], ["shutdown"]],
+      "skip, in mpv: an idle instead ends in idle")
+  }
+
+  function startRequestSparesWhatPlays() {
+    var h = root.h
+    var r = root.rig()
+    var keys = root.threeItems(r)
+    r.playback.next()
+    root.carry(r)
+    root.quiet(r)
+    r.player.currentKey = keys[1]
+    h.check(r.playback.queuePlay(keys[2]), "spares: another row is asked for")
+    h.equal(root.removedKeys(r), [keys[2], keys[0]], "spares: the other entries leave, from the back")
+    h.equal(r.player.playlist(), [keys[1]], "spares: the entry that plays is not among them")
+    h.equal(root.count(r.player, "load"), 0, "spares: and nothing is added before the new track has started")
+    r.player.report()
+    r.player.clearCalls()
+    h.check(r.playback.playTrack(root.track(root.idA)), "spares: a new track altogether")
+    h.equal([root.removedKeys(r), r.player.playlist()], [[], [keys[1]]],
+      "spares: there is nothing left to remove, and the playing entry stays")
+    r.resolver.succeed()
+    h.equal([root.lastLoad(r)[4].mode, r.player.playlist()], ["replace", [r.playback.current.key]],
+      "spares: until the replacing load takes its place")
+  }
+
+  // The player turns keys into positions through what mpv last reported.
+  // So the window is planned only against a report that shows the last
+  // thing sent.
+  function windowWaitsForMpv() {
+    var h = root.h
+    var r = root.rig()
+    r.playback.enqueueTrack(root.track(root.idA))
+    r.playback.enqueueTrack(root.track(root.idB))
+    r.resolver.seed(root.idB)
+    var keys = r.playback.queue.map(function(item) { return item.key })
+    r.resolver.succeedFor(root.idA)
+    r.player.currentKey = keys[0]
+    r.player.loading(keys[0])
+    root.begin(r, keys[0])
+    h.equal([root.shown(r), root.count(r.player, "load")], [["playing", "", 0], 1],
+      "window: the track plays, and mpv has not reported its playlist yet: nothing is added")
+    r.player.report()
+    h.equal([root.count(r.player, "load"), root.lastLoad(r)[0], root.lastLoad(r)[4]],
+      [2, keys[1], { mode: "append-play", index: -1, startAt: 0, live: false }],
+      "window: at mpv's report the next item is appended, to be played after this one")
+    h.equal(root.lastLoad(r)[3], r.resolver.entry(root.idB).file, "window: from the file its lookup wrote")
+    r.player.clearCalls()
+    r.player.report()
+    r.player.report()
+    h.equal(r.player.calls, [], "window: a playlist in shape is left alone, however often it is reported")
+    h.equal(r.playback.keepIds(), [root.idA, root.idB], "window: both lookups are to be kept")
+
+    // In idle and in error there is no mpv to plan for.
+    r.playback.stop()
+    r.player.clearCalls()
+    r.player.entryKeys = [7, 8]
+    h.equal(r.player.calls, [], "window: a report in idle is ignored")
+  }
+
+  function lookingAhead() {
+    var h = root.h
+    var r = root.rig()
+    r.playback.enqueueTrack(root.track(root.idA))
+    h.equal(r.playback.enqueueId(root.idB), "ok", "ahead: set-up, a second item known by its id")
+    var keys = r.playback.queue.map(function(item) { return item.key })
+    r.resolver.succeedFor(root.idA)
+    r.player.report()
+    r.player.open(keys[0])
+    r.resolver.clearCalls()
+    h.equal(r.resolver.pending(), 0, "ahead: nothing is looked up while the track loads")
+    root.begin(r, keys[0])
+    h.equal(r.resolver.calls, [{ name: "ensure", args: [root.idB, "next"] }],
+      "ahead: once it plays, the item after it is looked up in the background")
+    r.playback.enqueueTrack(root.track(root.idC))
+    r.playback.queueMove(keys[0], 0)
+    h.equal(root.count(r.resolver, "ensure"), 1, "ahead: once, whatever happens to the queue meanwhile")
+    r.resolver.succeedFor(root.idB, { title: "Looked up" })
+    h.equal([r.playback.queue[1].title, r.playback.queue[1].key], ["Looked up", keys[1]],
+      "ahead: the answer names the item")
+    h.equal([root.lastLoad(r)[0], root.lastLoad(r)[2], root.lastLoad(r)[4].mode],
+      [keys[1], "Looked up", "append-play"], "ahead: and puts it into mpv's playlist")
+    h.equal(root.shown(r), ["playing", "", 0], "ahead: the track that plays is not disturbed")
+
+    // A lookup ahead that fails costs nothing: the track gets its own
+    // attempt, and its own error, when its turn comes.
+    var failing = root.rig()
+    failing.playback.enqueueTrack(root.track(root.idA))
+    failing.playback.enqueueTrack(root.track(root.idB))
+    var failingKeys = failing.playback.queue.map(function(item) { return item.key })
+    failing.resolver.succeedFor(root.idA)
+    failing.player.report()
+    failing.player.open(failingKeys[0])
+    root.begin(failing, failingKeys[0])
+    root.quiet(failing)
+    failing.resolver.failFor(root.idB, "E_NETWORK")
+    h.equal([root.shown(failing), failing.playback.noticeCode, failing.player.calls, failing.resolver.calls],
+      [["playing", "", 0], "", [], []], "ahead: a failed lookup changes nothing")
+
+    // While nothing may be started, nothing is looked up ahead either.
+    var held = root.rig()
+    held.playback.enqueueTrack(root.track(root.idA))
+    held.playback.enqueueTrack(root.track(root.idB))
+    var heldKeys = held.playback.queue.map(function(item) { return item.key })
+    held.resolver.succeedFor(root.idA)
+    held.player.report()
+    held.player.open(heldKeys[0])
+    held.playback.hold = true
+    held.resolver.clearCalls()
+    root.begin(held, heldKeys[0])
+    h.equal(root.count(held.resolver, "ensure"), 0, "ahead: not under a hold")
+  }
+
+  // A video that needs a signed-in account: the saved login is used only
+  // when the user asks for it, for that one attempt.
+  function withTheAccount() {
+    var h = root.h
+    var r = root.rig()
+    root.request(r, root.idA)
+    h.check(r.playback.playWithAccount() === false, "account: not while a lookup runs")
+    r.resolver.fail("E_NEEDS_ACCOUNT")
+    h.equal(root.shown(r), ["error", "E_NEEDS_ACCOUNT", 0], "account: set-up")
+    root.quiet(r)
+    h.check(r.playback.playWithAccount(), "account: accepted for the track that needs one")
+    h.equal([root.shown(r), r.resolver.calls], [["resolving", "", 0], [{
+      name: "refreshWithAccount", args: [root.idA]
+    }]], "account: one lookup with the login, for that video")
+    r.resolver.succeed()
+    h.equal([root.shown(r), root.lastLoad(r)[1], root.lastLoad(r)[4].mode],
+      [["loading", "", 0], root.idA, "replace"],
+      "account: its answer is loaded like any other")
+    var key = r.playback.current.key
+    r.player.loading(key)
+    root.begin(r, key)
+    h.check(r.playback.playWithAccount() === false, "account: not while the track plays")
+    // A recovery is made here, not asked for by the user: it never
+    // carries the login.
+    root.quiet(r)
+    r.player.position = 50
+    r.player.ended(key, "error", root.prematureEof)
+    h.equal(r.resolver.names().filter(function(name) { return name !== "retain" }), ["refresh"],
+      "account: a recovery of that track looks it up without the login")
+    r.resolver.fail("E_NEEDS_ACCOUNT")
+    h.equal(root.shown(r), ["error", "E_NEEDS_ACCOUNT", 0],
+      "account: and so ends where the user can ask again")
+    root.quiet(r)
+    h.check(r.playback.playPause(), "account: an ordinary retry")
+    h.equal(r.resolver.names(), ["refresh"], "account: does not carry the login either")
+    r.resolver.fail("E_NETWORK")
+    h.check(r.playback.playWithAccount() === false, "account: not offered for another error")
+    r.playback.stop()
+    h.check(r.playback.playWithAccount() === false, "account: not in idle")
+
+    // The login never takes the place of a lookup made for another reason.
+    var held = root.rig()
+    root.request(held, root.idA)
+    held.resolver.fail("E_NEEDS_ACCOUNT")
+    held.playback.hold = true
+    held.resolver.clearCalls()
+    h.check(held.playback.playWithAccount() === false, "account: refused while nothing may start")
+    h.equal(held.resolver.calls, [], "account: and nothing is looked up")
+
+    // A resolver that has no such lookup: the request declines.
+    var bare = root.bareResolver()
+    var old = root.rig()
+    old.playback.resolver = bare
+    old.playback.playTrack(root.track(root.idA))
+    bare.waiting.shift()({ ok: false, code: "E_NEEDS_ACCOUNT", entry: null, cached: false })
+    h.equal(root.shown(old), ["error", "E_NEEDS_ACCOUNT", 0], "account: set-up without the lookup")
+    h.check(old.playback.playWithAccount() === false, "account: declines when the resolver cannot do it")
+    h.equal(root.shown(old), ["error", "E_NEEDS_ACCOUNT", 0], "account: and the error stays")
   }
 }

@@ -6,7 +6,8 @@ import qs.Ui
 // uses it for the states in which nothing else can be shown (no service, an
 // update that needs a shell restart, a missing tool, the proxy question)
 // and the main page for notices the user dismisses. The message is never
-// cut: it wraps as far as it needs.
+// cut: it wraps as far as it needs. The buttons take no keyboard focus of
+// their own: the panel moves its one cursor onto them and says so here.
 BorderSurface {
   id: root
 
@@ -14,6 +15,8 @@ BorderSurface {
   // A button is shown for each label that is not empty.
   property string primaryLabel: ""
   property string secondaryLabel: ""
+  // Which button carries the panel's cursor: "primary", "secondary" or "".
+  property string cursor: ""
   property color fg: Color.foreground
   property string fontFamily: Style.font.family
 
@@ -55,6 +58,7 @@ BorderSurface {
         foreground: root.fg
         fontFamily: root.fontFamily
         fontSize: Style.font.bodySmall
+        hasCursor: root.cursor === "primary"
         onClicked: root.primary()
       }
 
@@ -65,6 +69,7 @@ BorderSurface {
         foreground: root.fg
         fontFamily: root.fontFamily
         fontSize: Style.font.bodySmall
+        hasCursor: root.cursor === "secondary"
         onClicked: root.secondary()
       }
     }

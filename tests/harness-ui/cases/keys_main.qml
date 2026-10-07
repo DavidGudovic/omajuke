@@ -2,7 +2,9 @@ import QtQuick
 
 // Real key and pointer events through the panel body on the main page:
 // which of them move the highlight, which type, which call the service, and
-// that none of them does more than the keyboard table says.
+// that none of them does more than the keyboard table says. Also when the
+// service is told which result the user rests on: after the user moved the
+// highlight there or searched for it, never because a panel was opened.
 QtObject {
   id: root
 
@@ -31,6 +33,14 @@ QtObject {
   function highlighted(h) {
     return h.findAll(root.body, function(item) { return root.isRow(item) && item.hasCursor })
       .map(function(row) { return row.track.title })
+  }
+  // The tooltips of the icon buttons that carry the cursor: here that can
+  // only be the settings button.
+  function carried(h) {
+    return h.findAll(root.body, function(item) {
+      return item.hasCursor === true && item.visible && item.thumbPath === undefined
+        && typeof item.tooltipText === "string" && item.tooltipText !== ""
+    }).map(function(item) { return item.tooltipText })
   }
   function row(h, title) {
     return h.find(root.body, function(item) { return root.isRow(item) && item.track.title === title })
@@ -85,17 +95,25 @@ QtObject {
         h.key(Qt.Key_Return, Qt.ShiftModifier)
       },
       function() {
-        h.equal(h.calls("playTrack"), [[root.recents[1]]], "Shift+Enter is Enter until there is a queue")
+        h.equal(h.calls("enqueueTrack"), [[root.recents[1]]], "Shift+Enter queues the highlighted row")
+        h.equal(h.actions(), ["enqueueTrack"], "and does nothing else: it does not play it")
         h.resetCalls()
         h.key(Qt.Key_Up)
         h.equal(root.highlighted(h), ["Recent one"], "Up moves back")
+        h.equal(root.carried(h), [], "no button carries the cursor while a row does")
         h.key(Qt.Key_Up)
-        h.equal(root.highlighted(h), ["Recent one"], "and stops at the first row")
+        h.equal([root.highlighted(h), root.carried(h)], [[], ["Settings"]],
+          "Up from the first row reaches the settings button, which lies above the list")
+        h.key(Qt.Key_Up)
+        h.equal(root.carried(h), ["Settings"], "and stops there: nothing plays, so there is no strip")
+        h.key(Qt.Key_Down)
+        h.equal([root.highlighted(h), root.carried(h)], [["Recent one"], []],
+          "Down returns to the row the highlight left")
         h.key(Qt.Key_PageDown)
         h.equal(root.highlighted(h), ["Recent three"], "PageDown stops at the last row")
         h.key(Qt.Key_PageUp)
         h.equal(root.highlighted(h), ["Recent one"], "PageUp returns to the first")
-        h.equal(h.actions(), [], "none of them called anything")
+        h.equal(h.actions(), [], "none of them called anything: a recent track is no result to hint")
         h.key(Qt.Key_Slash)
       },
       function() {
@@ -142,11 +160,24 @@ QtObject {
       function() {
         h.equal(root.highlighted(h), ["Result one"], "fresh results put the highlight on the first one")
         h.check(root.field(h).activeFocus, "while the field keeps the keyboard")
+        h.equal(h.actions(), ["hintHighlight"], "the top hit of a search made here is hinted")
+        h.equal(h.calls("hintHighlight"), [["DDDDDDDDDDD"]], "by its id, once")
+        h.resetCalls()
         h.key(Qt.Key_Return)
       },
       function() {
         h.equal(h.calls("playTrack"), [[root.results[0]]], "so a second Enter plays the top hit")
         h.equal(h.actions(), ["playTrack"], "without searching again")
+        h.resetCalls()
+        h.key(Qt.Key_Down)
+        h.equal(h.calls("hintHighlight"), [["EEEEEEEEEEE"]], "Down onto another result hints that one")
+        h.key(Qt.Key_Down)
+        h.equal(h.calls("hintHighlight"), [["EEEEEEEEEEE"]], "a key that moves nothing hints nothing new")
+        h.key(Qt.Key_Up)
+        h.equal(h.calls("hintHighlight"), [["EEEEEEEEEEE"], ["DDDDDDDDDDD"]], "Up hints the row it lands on")
+        h.key(Qt.Key_Return, Qt.ShiftModifier)
+        h.equal(h.calls("enqueueTrack"), [[root.results[0]]], "Shift+Enter queues the highlighted result")
+        h.equal(h.actions(), ["hintHighlight", "hintHighlight", "enqueueTrack"], "and nothing else happened")
         h.resetCalls()
         // The track starts and enters the recents, as it does in the service.
         root.keptRow = root.row(h, "Result two")
@@ -169,9 +200,17 @@ QtObject {
         var first = root.row(h, "Result one")
         h.hover(first, 20, 10)
         h.equal(root.highlighted(h), ["Result two"], "the first pointer sample over a row is not a movement")
+        h.equal(h.actions(), [], "and hints nothing")
+        var second = root.row(h, "Result two")
         h.hover(first, 60, 20)
         h.equal(root.highlighted(h), ["Result one"], "a real movement moves the highlight")
-        h.equal(h.actions(), [], "hovering called nothing")
+        h.equal(h.actions(), [], "onto the row that is hinted already: no new hint")
+        h.hover(second, 20, 10)
+        h.hover(second, 60, 20)
+        h.equal(root.highlighted(h), ["Result two"], "the pointer moves on to the next row")
+        h.equal(h.calls("hintHighlight"), [["EEEEEEEEEEE"]], "which is hinted, as with the keyboard")
+        h.equal(h.actions(), ["hintHighlight"], "and nothing else was called")
+        h.resetCalls()
 
         h.key(Qt.Key_Escape)
         h.key(Qt.Key_Tab)
@@ -185,7 +224,8 @@ QtObject {
 
         // A pasted link that is not a video link.
         h.mock.returns = { submit: "link" }
-        h.key(Qt.Key_Down)
+        h.key(Qt.Key_Up)
+        h.equal(h.calls("hintHighlight"), [["DDDDDDDDDDD"]], "the highlight is back on the first result")
         h.key(Qt.Key_Slash)
         h.type("192.168.1.10/admin")
         h.key(Qt.Key_Return)
@@ -194,14 +234,17 @@ QtObject {
         h.equal(h.calls("submit"), [["192.168.1.10/admin", false]], "link: submitted once")
         h.check(root.shown(h, "text of E_LINK"), "link: the line shows")
         h.equal(h.find(root.body, root.isList).visible, false, "link: the list is hidden")
+        h.equal(h.calls("hintHighlight"), [["DDDDDDDDDDD"], [""]],
+          "link: with the list hidden, the hint for its row is withdrawn")
         h.resetCalls()
-        h.key(Qt.Key_Down)
-        h.check(root.field(h).activeFocus, "link: Down finds no row, the field keeps the keyboard")
         h.key(Qt.Key_Return)
         h.key(Qt.Key_Return, Qt.ShiftModifier)
+        h.check(root.field(h).activeFocus, "link: Enter finds no row, the field keeps the keyboard")
+        h.equal(root.carried(h), [],
+          "link: and Enter does not put the highlight on the settings button, which is always there")
       },
       function() {
-        h.equal(h.actions(), [], "link: Down and Enter call nothing while the line shows")
+        h.equal(h.actions(), [], "link: Enter calls nothing while the line shows")
         h.check(root.shown(h, "text of E_LINK"), "link: the line is still there")
         h.key(Qt.Key_Z)
       },
@@ -209,7 +252,10 @@ QtObject {
         h.check(!root.shown(h, "text of E_LINK"), "link: the line is gone with the next character")
         h.equal(root.field(h).text, "192.168.1.10/adminz", "which was typed")
         h.equal(h.find(root.body, root.isList).visible, true, "and the results are back")
-        h.equal(h.actions(), [], "typing it called nothing")
+        h.equal(root.highlighted(h), ["Result one"], "with the highlight where the user had put it")
+        h.equal(h.calls("hintHighlight"), [["DDDDDDDDDDD"]], "so that result is hinted again")
+        h.equal(h.actions(), ["hintHighlight"], "typing called nothing else")
+        h.resetCalls()
 
         // Emptying the field returns to the home list.
         h.key(Qt.Key_A, Qt.ControlModifier)
@@ -219,6 +265,76 @@ QtObject {
         h.equal(root.field(h).text, "", "Ctrl+A and Backspace are the field's own and empty it")
         h.equal(h.actions(), ["clearSearch"], "an emptied field clears the service's search")
         h.equal(h.richTexts(root.body), [], "every text element is plain text")
+
+        // The hint and the life of the panel: a result is highlighted and
+        // hinted, then the panel closes.
+        h.resetCalls()
+        h.key(Qt.Key_Down)
+        h.equal(root.highlighted(h), ["Result two"], "Down moves on to the second result")
+        h.equal(h.calls("hintHighlight"), [["EEEEEEEEEEE"]], "which is hinted")
+        h.resetCalls()
+        h.close(root.body)
+        h.equal(h.calls("hintHighlight"), [[""]], "closing the panel withdraws the hint")
+        h.hide(root.body)
+      },
+      function() {
+        h.resetCalls()
+        h.open(root.body)
+      },
+      function() {
+        h.equal(h.findAll(root.body, root.isRow).length, 2, "reopened over the results that are still there")
+        h.equal(root.highlighted(h), [], "nothing is highlighted")
+        h.equal(h.actions(), [], "and opening hints nothing")
+        // Results that arrive for a search made elsewhere put the highlight
+        // on the first row like any others, but the user did not ask for them.
+        h.mock.searchQuery = "other"
+        h.mock.searchResults = [root.results[1], root.results[0]]
+        h.mock.searchState = "searching"
+        h.mock.searchState = "results"
+      },
+      function() {
+        h.equal(root.field(h).text, "other", "a search from elsewhere reaches the field")
+        h.equal(root.highlighted(h), ["Result two"], "and its first result is highlighted")
+        h.equal(h.actions(), [], "but not hinted: it was not searched for here")
+        h.key(Qt.Key_Down)
+        h.equal(h.calls("hintHighlight"), [["DDDDDDDDDDD"]], "until the user moves the highlight")
+        // New rows under the highlight are not a choice either.
+        h.resetCalls()
+        h.mock.searchResults = [root.results[1]]
+      },
+      function() {
+        h.equal(root.highlighted(h), ["Result two"], "the highlight is clamped onto the row that is left")
+        h.equal(h.calls("hintHighlight"), [[""]], "rows replaced under the highlight withdraw the hint")
+
+        // The settings page, and through it every page behind it, by keys
+        // alone.
+        h.resetCalls()
+        h.key(Qt.Key_Up)
+        h.equal([root.highlighted(h), root.carried(h)], [[], ["Settings"]], "settings: Up from the first row")
+        h.key(Qt.Key_Return, Qt.ShiftModifier)
+        h.equal([root.body.page, h.actions()], ["main", []], "settings: Shift+Enter presses nothing")
+        h.key(Qt.Key_Return)
+      },
+      function() {
+        h.equal([root.body.page, h.actions()], ["settings", []],
+          "settings: Enter on the button opens the settings page, and calls nothing")
+        h.key(Qt.Key_Escape)
+      },
+      function() {
+        h.equal(root.body.page, "main", "settings: Esc returns to the main page")
+        h.check(root.field(h).activeFocus, "settings: where the field has the keyboard")
+        h.equal([root.highlighted(h), root.carried(h)], [[], []], "settings: and nothing is highlighted")
+        // Without a single row, Down still finds the button.
+        h.mock.searchResults = []
+        h.mock.searchState = "empty"
+      },
+      function() {
+        h.equal(h.findAll(root.body, root.isRow).length, 0, "no rows: the list is empty")
+        h.key(Qt.Key_Down)
+        h.equal(root.carried(h), ["Settings"], "no rows: Down reaches the settings button")
+        h.check(!root.field(h).activeFocus, "no rows: and the focus leaves the field")
+        h.key(Qt.Key_Slash)
+        h.check(root.field(h).activeFocus, "no rows: slash returns to the field")
         h.finish()
       }
     ])

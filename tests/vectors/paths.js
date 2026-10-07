@@ -2,7 +2,7 @@
 
 // Input and expectation table for lib/Paths.js: which environments yield
 // a table of paths and which are refused, which exact paths the plugin may
-// write or remove, and how runtime files are named. The same table runs
+// write or remove and what each of them is, and how runtime files are named. The same table runs
 // under node and inside Qt's JavaScript engine.
 
 // The usual session, and the table resolve() returns for it.
@@ -145,6 +145,11 @@ var CASES = [
 
   // ---- owns: the exact shapes ----
   { fn: "owns", args: [_PATHS, "/home/user/.local/state/omajuke/state.json"], expect: true },
+  { fn: "owns", args: [_PATHS, "/home/user/.local/share/omajuke/cookies.txt"], expect: true },
+  { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/jar/1.txt"], expect: true },
+  { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/jar/9999999999.txt"], expect: true },
+  { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/signin/1"], expect: true },
+  { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/signin/9999999999"], expect: true },
   { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/info/1.json"], expect: true },
   { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/info/0.json"], expect: true },
   { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/info/9999999999.json"], expect: true },
@@ -184,9 +189,30 @@ var CASES = [
   { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/mpv.sock"], expect: false },
   { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/ytcache/1.json"], expect: false },
   { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/deno/1.json"], expect: false },
-  { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/jar/1.txt"], expect: false },
-  { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/signin/1"], expect: false },
-  { fn: "owns", args: [_PATHS, "/home/user/.local/share/omajuke/cookies.txt"], expect: false },
+  { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/jar/1.json"], expect: false },
+  { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/jar/1"], expect: false },
+  { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/jar/cookies.txt"], expect: false },
+  { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/jar"], expect: false },
+  { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/signin"], expect: false },
+  { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/signin/"], expect: false },
+  { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/signin/1/"], expect: false },
+  { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/signin/1/profile"], expect: false },
+  { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/signin/1/export.txt"], expect: false },
+  { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/signin/1.txt"], expect: false },
+  { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/signin/a"], expect: false },
+  { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/signin/12345678901"], expect: false },
+  { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/signin/.."], expect: false },
+  { fn: "owns", args: [_PATHS, "/run/user/1000/omajuke/signin/1/.."], expect: false },
+  { fn: "owns", args: [_PATHS, "/home/user/.local/share/omajuke"], expect: false },
+  { fn: "owns", args: [_PATHS, "/home/user/.local/share/omajuke/"], expect: false },
+  { fn: "owns", args: [_PATHS, "/home/user/.local/share/omajuke/cookies.txt/"], expect: false },
+  { fn: "owns", args: [_PATHS, "/home/user/.local/share/omajuke/cookies.txt.bak"], expect: false },
+  { fn: "owns", args: [_PATHS, "/home/user/.local/share/omajuke/.cookies.txt.AbC123"], expect: false },
+  { fn: "owns", args: [_PATHS, "/home/user/.local/share/omajuke/1.txt"], expect: false },
+  { fn: "owns", args: [_PATHS, "/home/user/.local/share/omajuke/state.json"], expect: false },
+  { fn: "owns", args: [_PATHS, "/home/user/.local/state/omajuke/cookies.txt"], expect: false },
+  { fn: "owns", args: [_PATHS, "/home/user/.config/google-chrome/Default/Cookies"], expect: false },
+  { fn: "owns", args: [_PATHS, "/home/user/.mozilla/firefox/default/cookies.sqlite"], expect: false },
   { fn: "owns", args: [_PATHS, "/home/user/.local/state/omajuke"], expect: false },
   { fn: "owns", args: [_PATHS, "/home/user/.local/state/omajuke/"], expect: false },
   { fn: "owns", args: [_PATHS, "/home/user/.local/state/omajuke/state.json/"], expect: false },
@@ -245,7 +271,61 @@ var CASES = [
   { fn: "thumbFile", args: [_PATHS, "Abc123Def4Q"], expect: "" },
   { fn: "thumbFile", args: [_PATHS, null], expect: "" },
   { fn: "thumbFile", args: [_NO, 12], expect: "" },
-  { fn: "thumbFile", args: [null, 12], expect: "" }
+  { fn: "thumbFile", args: [null, 12], expect: "" },
+
+  // ---- jarCopyFile, signinAttemptDir: the same rule for the sign-in files ----
+  { fn: "jarCopyFile", args: [_PATHS, 1], expect: "/run/user/1000/omajuke/jar/1.txt" },
+  { fn: "jarCopyFile", args: [_PATHS, 9999999999], expect: "/run/user/1000/omajuke/jar/9999999999.txt" },
+  { fn: "signinAttemptDir", args: [_PATHS, 3], expect: "/run/user/1000/omajuke/signin/3" },
+  { fn: "signinAttemptDir", args: [_PATHS, 9999999999], expect: "/run/user/1000/omajuke/signin/9999999999" },
+  { fn: "signinAttemptDir", args: [_PATHS_XDG, 2], expect: "/tmp/oj-test.1/run_dir/omajuke/signin/2" },
+  { fn: "jarCopyFile", args: [_PATHS, 0], expect: "" },
+  { fn: "jarCopyFile", args: [_PATHS, 1.5], expect: "" },
+  { fn: "jarCopyFile", args: [_PATHS, "1"], expect: "" },
+  { fn: "jarCopyFile", args: [_PATHS, "../../x"], expect: "" },
+  { fn: "jarCopyFile", args: [_PATHS, null], expect: "" },
+  { fn: "jarCopyFile", args: [_NO, 1], expect: "" },
+  { fn: "jarCopyFile", args: [null, 1], expect: "" },
+  { fn: "signinAttemptDir", args: [_PATHS, 0], expect: "" },
+  { fn: "signinAttemptDir", args: [_PATHS, -3], expect: "" },
+  { fn: "signinAttemptDir", args: [_PATHS, 10000000000], expect: "" },
+  { fn: "signinAttemptDir", args: [_PATHS, "3"], expect: "" },
+  { fn: "signinAttemptDir", args: [_PATHS, ".."], expect: "" },
+  { fn: "signinAttemptDir", args: [_PATHS, "3/profile"], expect: "" },
+  { fn: "signinAttemptDir", args: [_PATHS, [3]], expect: "" },
+  { fn: "signinAttemptDir", args: [_NO, 3], expect: "" },
+  { fn: "signinAttemptDir", args: [null, 3], expect: "" },
+  // A table that says ok but lacks the directory names nothing.
+  { fn: "infoFile", args: [{ ok: true }, 1], expect: "" },
+  { fn: "jarCopyFile", args: [{ ok: true }, 1], expect: "" },
+  { fn: "signinAttemptDir", args: [{ ok: true, signinDir: "" }, 1], expect: "" },
+
+  // ---- kind: what each owned path is, so an operation can be held to its own ----
+  { fn: "kind", args: [_PATHS, "/home/user/.local/state/omajuke/state.json"], expect: "state" },
+  { fn: "kind", args: [_PATHS, "/run/user/1000/omajuke/info/1.json"], expect: "info" },
+  { fn: "kind", args: [_PATHS, "/run/user/1000/omajuke/thumbs/12.jpg"], expect: "thumb" },
+  { fn: "kind", args: [_PATHS, "/home/user/.local/share/omajuke/cookies.txt"], expect: "jar" },
+  { fn: "kind", args: [_PATHS, "/run/user/1000/omajuke/jar/7.txt"], expect: "jarCopy" },
+  { fn: "kind", args: [_PATHS, "/run/user/1000/omajuke/signin/7"], expect: "signinAttempt" },
+  { fn: "kind", args: [_PATHS_XDG, "/data/share/omajuke/cookies.txt"], expect: "jar" },
+  { fn: "kind", args: [_PATHS, "/run/user/1000/omajuke/signin/7/profile"], expect: "" },
+  { fn: "kind", args: [_PATHS, "/run/user/1000/omajuke/signin"], expect: "" },
+  { fn: "kind", args: [_PATHS, "/run/user/1000/omajuke/jar"], expect: "" },
+  { fn: "kind", args: [_PATHS, "/run/user/1000/omajuke/jar/7.json"], expect: "" },
+  { fn: "kind", args: [_PATHS, "/run/user/1000/omajuke/info/7.txt"], expect: "" },
+  { fn: "kind", args: [_PATHS, "/run/user/1000/omajuke/mpv.sock"], expect: "" },
+  { fn: "kind", args: [_PATHS, "/run/user/1000/omajuke"], expect: "" },
+  { fn: "kind", args: [_PATHS, "/home/user/.local/share/omajuke"], expect: "" },
+  { fn: "kind", args: [_PATHS, "state"], expect: "" },
+  { fn: "kind", args: [_PATHS, "jar"], expect: "" },
+  { fn: "kind", args: [_PATHS, ""], expect: "" },
+  { fn: "kind", args: [_PATHS, null], expect: "" },
+  { fn: "kind", args: [_PATHS, 7], expect: "" },
+  { fn: "kind", args: [_PATHS], expect: "" },
+  { fn: "kind", args: [_NO, "/home/user/.local/share/omajuke/cookies.txt"], expect: "" },
+  { fn: "kind", args: [null, "/run/user/1000/omajuke/signin/7"], expect: "" },
+  { fn: "kind", args: [{ ok: true, jarFile: "", stateFile: "", signinDir: "" }, ""], expect: "" },
+  { fn: "kind", args: [{ ok: true, signinDir: "signin" }, "signin/1"], expect: "" }
 ]
 
 if (typeof module !== "undefined") {

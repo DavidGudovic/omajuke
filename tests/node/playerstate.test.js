@@ -4,7 +4,9 @@
 // signals that come out with what really happened. The second half feeds
 // hand-written lines for what cannot be recorded without a network or a
 // second program: a connection that breaks mid-track, a live stream, and
-// the odd inputs.
+// the odd inputs. The last part is about mpv's playlist as a list of track
+// keys: the list the player changes with each of its own commands must be
+// the playlist mpv reports afterwards, in every trace.
 var test = require("node:test")
 var assert = require("node:assert")
 var fs = require("fs")
@@ -66,8 +68,32 @@ var EXPECTED = {
   external_stop: ["idle", "loading 1", "started 1", "idle"],
   // A file we did not load is never reported: mpv is stopped and goes idle.
   foreign_load: ["idle", "loading 1", "started 1", "idle"],
+  // Keys 2 to 4 are held beside the track that plays; one is removed, and
+  // key 2 is started by its position. Nothing ends, nothing goes idle.
+  playlist_edit: ["idle", "loading 1", "started 1", "loading 2", "started 2"],
+  playlist_burst: ["idle", "loading 1", "started 1"],
+  // Removing the entry that plays is a step to the next one, not an end.
+  playlist_remove_current: ["idle", "loading 1", "started 1", "loading 2", "started 2"],
+  playlist_clear: ["idle", "loading 1", "started 1"],
+  // A position that is not in the playlist: mpv stops playing.
+  play_index_past_end: ["idle", "loading 1", "started 1", "idle"],
+  // Video comes and goes beside the audio without a word about the track.
+  video_show_hide: ["idle", "loading 1", "started 1"],
+  video_track_change: ["idle", "loading 1", "started 1", "loading 2", "started 2"],
+  video_show_again: ["idle", "loading 1", "started 1"],
+  video_closed: ["idle", "loading 1", "started 1", "videoClosed"],
+  video_add_fails: ["idle", "loading 1", "started 1"],
+  output_select: ["idle", "loading 1", "started 1"],
   lost_load: ["idle", "idle"]
 }
+
+// The traces in which another program changes mpv's playlist behind our
+// back, and the one that uses a command the player never sends.
+var NOT_OUR_PLAYLIST = ["external_stop", "foreign_load", "lost_load", "playlist_clear"]
+
+// The traces whose last file is the long one.
+var ENDS_LONG = ["playlist_burst", "playlist_clear", "video_show_hide", "video_show_again", "video_closed",
+  "video_add_fails"]
 
 // What the reducer asks the player to send, besides questions about the
 // position. Everywhere else it asks for nothing.
@@ -131,7 +157,26 @@ function replay(trace) {
   var requests = 0
   var keys = 0
   var quitting = false
-  var run = { signals: [], phases: [state.phase], answers: [], positions: [], started: 0, state: state }
+  var run = {
+    signals: [], phases: [state.phase], answers: [], positions: [], started: 0, state: state,
+    keys: [], adopted: [], surprises: [], passedOver: 0
+  }
+  // The playlist as keys, kept the way the player keeps it: changed at
+  // once by each command of ours, and set to what mpv reports whenever no
+  // such command is unanswered.
+  var edits = new Set()
+  var playlistReads = new Set()
+
+  function reported(data, index) {
+    if (edits.size > 0) {
+      run.passedOver++
+      return
+    }
+    var keys = PlayerState.keysOf(MpvProto.playlistIds(data), entryKind)
+    if (JSON.stringify(keys) !== JSON.stringify(run.keys)) run.surprises.push({ index: index, keys: keys })
+    run.keys = keys
+    run.adopted.push(keys.join())
+  }
 
   function entryKind(id) {
     if (entries.has(id)) return { key: entries.get(id), dead: false, live: false }
@@ -159,7 +204,18 @@ function replay(trace) {
     if (record.send !== undefined) {
       requests++
       var command = record.send
-      if (command[0] === "loadfile") loads.set(requests, { key: ++keys, mode: command[2] })
+      if (command[0] === "loadfile") {
+        loads.set(requests, { key: ++keys, mode: command[2] })
+        run.keys = PlayerState.keysAfterLoad(run.keys, keys, command[2], command[3])
+        edits.add(requests)
+      } else if (command[0] === "playlist-remove") {
+        run.keys = PlayerState.keysAfterRemove(run.keys, command[1])
+        edits.add(requests)
+      } else if (command[0] === "stop") {
+        run.keys = []
+        edits.add(requests)
+      }
+      if (command[0] === "get_property" && command[1] === "playlist") playlistReads.add(requests)
       if (command[0] === "get_property" && command[1] === "time-pos") questions.add(requests)
       if (command[0] === "quit") quitting = true
       // The player moves the position itself before it sends a seek.
@@ -173,6 +229,7 @@ function replay(trace) {
         run.positions.push({ estimate: PlayerState.positionNow(state, record.t), actual: message.data })
       }
       take(PlayerState.onEvent(state, message, entryKind, record.t), index)
+      if (message.event === "property-change" && message.name === "playlist") reported(message.data, index)
       return
     }
     var loaded = loads.get(message.request_id)
@@ -185,6 +242,8 @@ function replay(trace) {
       }
       entries.set(id, loaded.key)
     }
+    edits.delete(message.request_id)
+    if (playlistReads.has(message.request_id) && message.error === "") reported(message.data, index)
     if (questions.has(message.request_id) && message.error === "") {
       run.positions.push({ estimate: PlayerState.positionNow(state, record.t), actual: message.data })
       take(PlayerState.onProperty(state, "time-pos", message.data, record.t), index)
@@ -248,7 +307,8 @@ function ours(count) {
 
 test("exports exactly the documented functions", function() {
   assert.deepStrictEqual(Object.keys(PlayerState).sort(),
-    ["initial", "onEvent", "onLocalSeek", "onLocalStop", "onProperty", "positionNow"])
+    ["initial", "keysAfterLoad", "keysAfterRemove", "keysOf", "onEvent", "onLocalSeek", "onLocalStop",
+      "onProperty", "positionNow"])
 })
 
 test("the fixture holds every required trace, and each trace has its expectation", function() {
@@ -400,7 +460,7 @@ test("the estimated position stays with what mpv reports", function() {
 
 test("after the last line of each trace the state is what mpv was left in", function() {
   var idle = ["stop", "eof_last", "error_last", "error_not_media", "error_no_data", "seek_past_end",
-    "start_near_end", "external_stop", "foreign_load", "lost_load"]
+    "start_near_end", "external_stop", "foreign_load", "lost_load", "play_index_past_end"]
   Object.keys(EXPECTED).forEach(function(name) {
     var state = replay(fixture.traces[name]).state
     if (idle.indexOf(name) !== -1) {
@@ -412,7 +472,7 @@ test("after the last line of each trace the state is what mpv was left in", func
       // leaves the track current: nothing comes after it.
       assert.ok(state.key > 0, name)
       assert.strictEqual(state.idleActive, false, name)
-      assert.strictEqual(state.duration, 3, name)
+      assert.strictEqual(state.duration, ENDS_LONG.indexOf(name) !== -1 ? 12 : 3, name)
     }
     assert.strictEqual(state.volume, name === "external_volume_speed" ? 100 : 70, name)
     assert.strictEqual(state.mute, false, name)
@@ -1152,4 +1212,192 @@ test("any speed but 1 is set back", function() {
   })
   var m = machine(ours(1))
   assert.deepStrictEqual(m.set("speed", 1).commands, [])
+})
+
+// ---- mpv's playlist as track keys ----
+
+test("a load changes the list of keys the way mpv will change its playlist", function() {
+  assert.deepStrictEqual(PlayerState.keysAfterLoad([], 1, "replace", -1), [1])
+  assert.deepStrictEqual(PlayerState.keysAfterLoad([1, 2, 3], 4, "replace", -1), [4])
+  assert.deepStrictEqual(PlayerState.keysAfterLoad([1], 2, "append-play", -1), [1, 2])
+  assert.deepStrictEqual(PlayerState.keysAfterLoad([], 2, "append-play"), [2])
+  assert.deepStrictEqual(PlayerState.keysAfterLoad([1, 2], 3, "insert-at", 0), [3, 1, 2])
+  assert.deepStrictEqual(PlayerState.keysAfterLoad([1, 2], 3, "insert-at", 1), [1, 3, 2])
+  // Behind the end there is no entry to go in front of: mpv appends.
+  assert.deepStrictEqual(PlayerState.keysAfterLoad([1, 2], 3, "insert-at", 2), [1, 2, 3])
+  assert.deepStrictEqual(PlayerState.keysAfterLoad([1, 2], 3, "insert-at", 9), [1, 2, 3])
+  // An entry that is not ours keeps its slot.
+  assert.deepStrictEqual(PlayerState.keysAfterLoad([0, 1], 3, "append-play", -1), [0, 1, 3])
+  // What is not a load the player can make changes nothing.
+  assert.deepStrictEqual(PlayerState.keysAfterLoad([1, 2], 3, "append", -1), [1, 2])
+  assert.deepStrictEqual(PlayerState.keysAfterLoad([1, 2], 0, "replace", -1), [1, 2])
+  assert.deepStrictEqual(PlayerState.keysAfterLoad([1, 2], "3", "append-play", -1), [1, 2])
+  assert.deepStrictEqual(PlayerState.keysAfterLoad(null, 3, "append-play", -1), [3])
+  var bad = [undefined, null, "1", -1, 1.5, NaN]
+  bad.forEach(function(index) {
+    assert.deepStrictEqual(PlayerState.keysAfterLoad([1, 2], 3, "insert-at", index), [1, 2, 3], String(index))
+  })
+})
+
+test("a removal takes exactly one slot, and only one that is there", function() {
+  assert.deepStrictEqual(PlayerState.keysAfterRemove([1, 2, 3], 0), [2, 3])
+  assert.deepStrictEqual(PlayerState.keysAfterRemove([1, 2, 3], 1), [1, 3])
+  assert.deepStrictEqual(PlayerState.keysAfterRemove([1, 2, 3], 2), [1, 2])
+  assert.deepStrictEqual(PlayerState.keysAfterRemove([0, 0, 5], 1), [0, 5])
+  var bad = [3, -1, 1.5, "1", NaN, null, undefined]
+  bad.forEach(function(index) {
+    assert.deepStrictEqual(PlayerState.keysAfterRemove([1, 2, 3], index), [1, 2, 3], String(index))
+  })
+  assert.deepStrictEqual(PlayerState.keysAfterRemove("123", 0), [])
+  assert.deepStrictEqual(PlayerState.keysAfterRemove(undefined, 0), [])
+})
+
+test("the list functions return a new list and leave theirs alone", function() {
+  var keys = [1, 2, 3]
+  var results = [
+    PlayerState.keysAfterLoad(keys, 4, "append-play", -1), PlayerState.keysAfterLoad(keys, 4, "insert-at", 0),
+    PlayerState.keysAfterLoad(keys, 4, "replace", -1), PlayerState.keysAfterLoad(keys, 4, "append", -1),
+    PlayerState.keysAfterRemove(keys, 1), PlayerState.keysAfterRemove(keys, 9)
+  ]
+  results.forEach(function(result) {
+    assert.ok(Array.isArray(result))
+    assert.notStrictEqual(result, keys)
+  })
+  assert.deepStrictEqual(keys, [1, 2, 3])
+})
+
+test("a reported playlist becomes one slot for each entry: its key, or 0 when it is not ours", function() {
+  var kinds = { 4: { key: 9, dead: false, live: false }, 5: { key: 2, dead: false, live: true } }
+  var entryKind = function(id) {
+    return Object.prototype.hasOwnProperty.call(kinds, id) ? kinds[id] : { key: 0, dead: id < 4 }
+  }
+  assert.deepStrictEqual(PlayerState.keysOf([], entryKind), [])
+  assert.deepStrictEqual(PlayerState.keysOf([4, 5], entryKind), [9, 2])
+  // A dead entry (3), a foreign one (6) and one without a usable id (0)
+  // keep their places, so that every position stays mpv's.
+  assert.deepStrictEqual(PlayerState.keysOf([3, 4, 6, 0, 5], entryKind), [0, 9, 0, 0, 2])
+  // A lookup that cannot be used adopts nothing.
+  assert.deepStrictEqual(PlayerState.keysOf([4, 5], null), [0, 0])
+  assert.deepStrictEqual(PlayerState.keysOf([4], function() { return { key: "9" } }), [0])
+  assert.deepStrictEqual(PlayerState.keysOf([4], function() { return null }), [0])
+  assert.deepStrictEqual(PlayerState.keysOf("45", entryKind), [])
+  assert.deepStrictEqual(PlayerState.keysOf(null, entryKind), [])
+  // No list grows beyond the longest queue.
+  var many = []
+  for (var i = 0; i < 500; i++) many.push(4)
+  assert.strictEqual(PlayerState.keysOf(many, entryKind).length, 200)
+  var full = PlayerState.keysOf(many, entryKind)
+  assert.strictEqual(PlayerState.keysAfterLoad(full, 7, "append-play").length, 200)
+})
+
+test("in every trace the list kept by our own commands is the playlist mpv reports next", function() {
+  Object.keys(EXPECTED).forEach(function(name) {
+    var run = replay(fixture.traces[name])
+    assert.ok(run.adopted.length >= 1, name + ": mpv reported its playlist")
+    if (NOT_OUR_PLAYLIST.indexOf(name) !== -1) return
+    assert.deepStrictEqual(run.surprises, [], name)
+  })
+  var finals = {
+    cold_load: [1], replace: [2], three_replaces: [4], stop: [], stop_then_load: [2],
+    // mpv keeps an entry that has ended, and one that failed.
+    eof_with_next: [1, 2], eof_last: [1], error_with_next: [1, 2], error_last: [1],
+    append_play_while_playing: [1, 2], playlist_next: [1, 2], playlist_prev: [1, 2],
+    // Appended twice, inserted in front, then two removals.
+    playlist_edit: [1, 2],
+    // Two removals and a load in one write: the back one first, so that
+    // both positions are those of the same playlist.
+    playlist_burst: [1, 4],
+    playlist_remove_current: [2], play_index_past_end: [1], video_track_change: [2]
+  }
+  Object.keys(finals).forEach(function(name) {
+    assert.deepStrictEqual(replay(fixture.traces[name]).keys, finals[name], name)
+  })
+  assert.deepStrictEqual(replay(fixture.traces.playlist_edit).adopted.filter(function(keys, i, list) {
+    return i === 0 || list[i - 1] !== keys
+  }), ["", "1", "1,2,3", "4,1,2,3", "4,1,2", "1,2"])
+})
+
+test("mpv answers a command before it reports what the command did to the playlist", function() {
+  // So a report that arrives while a command of ours is unanswered is older
+  // than that command, and the player does not take it. On a cold start the
+  // empty playlist of a fresh mpv arrives that way, behind the load that
+  // was sent with the handshake.
+  var cold = replay(fixture.traces.cold_load)
+  assert.strictEqual(cold.passedOver, 1)
+  assert.deepStrictEqual(cold.adopted, ["1"])
+  var checked = 0
+  Object.keys(EXPECTED).forEach(function(name) {
+    var trace = fixture.traces[name]
+    // The entry each load was answered with, by request.
+    var made = new Map()
+    trace.forEach(function(record) {
+      var id = record.recv ? MpvProto.entryId(record.recv.data) : 0
+      if (id > 0) made.set(record.recv.request_id, id)
+    })
+    var edits = new Map()
+    var last = []
+    var id = 0
+    trace.forEach(function(record) {
+      if (record.send !== undefined) {
+        id++
+        var changing = ["loadfile", "playlist-remove", "playlist-clear", "stop"]
+        if (changing.indexOf(record.send[0]) !== -1) edits.set(id, record.send[0])
+        return
+      }
+      var line = record.recv
+      if (line === undefined) return
+      if (line.request_id !== undefined) {
+        edits.delete(line.request_id)
+        return
+      }
+      if (line.event !== "property-change" || line.name !== "playlist") return
+      var ids = MpvProto.playlistIds(line.data)
+      // A report that comes while a command is unanswered shows the
+      // playlist as it was before that command: none of the entries an
+      // unanswered load made, and not the emptiness an unanswered stop
+      // leaves behind.
+      edits.forEach(function(command, request) {
+        checked++
+        if (command === "loadfile") assert.ok(ids.indexOf(made.get(request)) === -1, name)
+        if (command === "stop") assert.ok(ids.length > 0 || last.length === 0, name)
+      })
+      last = ids
+    })
+  })
+  assert.ok(checked >= 1)
+})
+
+test("an entry another program put into the playlist shows as a slot that is not ours", function() {
+  var foreign = replay(fixture.traces.foreign_load)
+  // Our track, the foreign file in its place, and nothing after our stop.
+  var calm = foreign.adopted.filter(function(keys, i, list) { return i === 0 || list[i - 1] !== keys })
+  assert.deepStrictEqual(calm, ["", "1", "0", ""])
+  assert.deepStrictEqual(replay(fixture.traces.external_stop).keys, [])
+  assert.deepStrictEqual(replay(fixture.traces.lost_load).keys, [])
+})
+
+test("video beside the audio leaves the position estimate where it was", function() {
+  var names = ["video_closed", "video_add_fails"]
+  names.forEach(function(name) {
+    var positions = replay(fixture.traces[name]).positions
+    assert.ok(positions.length >= 1, name)
+    positions.forEach(function(position) {
+      assert.ok(position.actual > 0.1, name + ": the track plays on")
+      assert.ok(Math.abs(position.estimate - position.actual) < 0.1,
+        name + ": estimated " + position.estimate + ", mpv says " + position.actual)
+    })
+  })
+})
+
+test("the window's close request reaches the reducer as one signal, and the track plays on", function() {
+  var trace = fixture.traces.video_closed
+  var run = replay(trace)
+  assert.strictEqual(run.signals.filter(function(signal) { return signal === "videoClosed" }).length, 1)
+  assert.strictEqual(run.signals[run.signals.length - 1], "videoClosed")
+  assert.ok(run.state.key === 1 && run.state.started, "the track is still the current one")
+  // No other trace holds the message.
+  Object.keys(EXPECTED).forEach(function(name) {
+    if (name === "video_closed") return
+    assert.ok(replay(fixture.traces[name]).signals.indexOf("videoClosed") === -1, name)
+  })
 })

@@ -18,8 +18,9 @@ QtObject {
   readonly property string idA: "AAAAAAAAAAA"
   readonly property var methods: [
     "close(): string", "enqueue(target: string): string", "next(): string", "open(): string",
-    "play(target: string): string", "playPause(): string", "previous(): string",
-    "search(query: string): string", "status(): string", "stop(): string", "toggle(): string"
+    "output(name: string): string", "play(target: string): string", "playPause(): string",
+    "previous(): string", "search(query: string): string", "status(): string", "stop(): string",
+    "toggle(): string", "video(action: string): string"
   ]
 
   function run(h) {
