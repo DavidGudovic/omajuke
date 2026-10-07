@@ -70,9 +70,8 @@ Leaves the machine: your search text and the videos you play, queue next or prel
 YouTube, the streams come from YouTube's media hosts, the thumbnails from `i.ytimg.com`. Only if
 you switch it on: a four-character hash prefix per track to `sponsor.ajay.app`; with a sign-in,
 your account's lists and, if you ask for it, watch reports, to YouTube. No telemetry, no update
-check.
-
-The README has the full tables.
+check. The [README](README.md) has the full tables under "What it connects to" and "What it
+stores".
 
 ## How untrusted input is handled
 
@@ -117,11 +116,11 @@ plugin:
   OmaJuke's own bind on that combination. A bind is only ever removed under a spelling of the
   modifiers that nobody types by hand. Where the list cannot be read or understood, nothing is
   made and nothing is removed.
-- The one exception is the moment the plugin is disabled or removed or the shell exits. Nothing
-  can be read or waited for then. The binds that the last completed check showed as OmaJuke's
-  own and nobody else's are removed without a new read of the list and without a new look at the
-  version or the configuration errors, and only if that last check had found nothing in the way.
-  See the known limits for what that can cost.
+- The one exception is the moment the plugin is disabled or removed or the shell exits, when
+  nothing can be read or waited for. The binds that the last completed check showed as OmaJuke's
+  own and nobody else's are then removed without a new read of the list, the version or the
+  configuration errors, and only if that check had found nothing in the way. The known limits
+  say what that can cost.
 - Nothing is written under `~/.config/hypr`. The clipboard is written by **Copy line** and never
   read.
 
@@ -155,9 +154,8 @@ This applies only after a sign-in:
 - The login is attached only to the requests listed in the README, and only to addresses on
   `www.youtube.com` that OmaJuke built itself. There are four: reading one of the account's
   lists, the one check of a new login, the watched report, and the lookup of one video after the
-  user pressed **Play with my account** for it. curl never gets it, and neither does mpv.
-  Searches, lookups for playing and preloading, the lookup ahead for the next track of the
-  queue, autoplay, thumbnails and sponsor lookups run without it.
+  user pressed **Play with my account** for it. Nothing else carries it, and curl and mpv never
+  get it.
 - The lookup of a video with the login has exactly one caller: the button on the notice for a
   track that failed because it needs an account, shown only while somebody is signed in. The
   answer is not remembered and no setting stands in for it. There is no IPC method for it.

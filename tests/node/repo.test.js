@@ -629,7 +629,7 @@ var LAYOUT = {
   ],
   "service and documents": [
     "Service.qml", "core/Playback.qml", "lib/Recover.js", "manifest.json", "README.md", "SECURITY.md",
-    "LICENSE", "NOTICE", "CHANGELOG.md", "preview.png", "tests/harness/FakePlayer.qml",
+    "LICENSE", "NOTICE", "CHANGELOG.md", "CONTRIBUTING.md", "preview.png", "tests/harness/FakePlayer.qml",
     "tests/harness/FakeResolver.qml",
     "tests/node/recover.test.js", "tests/harness/cases/playback_table.qml",
     "tests/harness/cases/play_basic.qml", "tests/harness/cases/play_error.qml",
