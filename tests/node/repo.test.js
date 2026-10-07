@@ -538,7 +538,8 @@ var LAYOUT = {
     "tests/node/errors.test.js", "tests/node/paths.test.js", "tests/node/vectors.test.js",
     "tests/node/repo.test.js", "tests/vectors/ids.js", "tests/vectors/clean.js", "tests/vectors/track.js",
     "tests/vectors/errors.js", "tests/vectors/paths.js", "tests/harness/cases/vectors_base.qml",
-    "tests/check.sh", "tests/lint-qml.js", "tests/fixtures/search.json", "tests/fixtures/video.json",
+    "tests/check.sh", "tests/cloud-env.sh", "tests/lint-qml.js", "tests/fixtures/search.json",
+    "tests/fixtures/video.json",
     ".gitignore", ".editorconfig"
   ],
   "processes and storage": [

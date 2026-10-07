@@ -106,6 +106,13 @@ process id it recorded itself, never by name. Two scripts are run by hand, outsi
 `tests/fixtures/mpv-traces.json` (after an mpv upgrade or a change to the launch flags), and
 `node tests/gen-binds.js` rewrites the made-up bind list `tests/fixtures/binds.txt`.
 
+Away from an Omarchy machine, in a throwaway Linux container such as a cloud coding session, run
+`tests/cloud-env.sh check` as root. The first run builds an Arch Linux root under `/opt/omajuke-env`
+with Quickshell, mpv, `qt6-declarative`, node and a pinned copy of Omarchy's shell, then runs
+`tests/check.sh` inside it as an unprivileged user against this checkout; `tests/cloud-env.sh run
+<command>` runs anything else there, such as one harness case. It needs network access, mounts
+`/proc`, `/dev` and `/sys` into that root, and is not for a machine anyone works on.
+
 What the harnesses cannot prove needs a person on an Omarchy desktop: real playback, the video
 window and shortcuts on a real Hyprland, how the panel looks, signing in with a real browser and
 account. Say so plainly when a change falls in that area; do not claim that it works. A bug found
