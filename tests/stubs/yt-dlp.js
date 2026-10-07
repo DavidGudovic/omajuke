@@ -3,9 +3,9 @@
 // Stands in for yt-dlp inside a harness run. No network is involved. It is
 // started in one of three ways, told apart by its arguments alone:
 //
-//   a lookup   "-a -" and "-J". Like the real tool it reads what to look up
-//              from standard input, one entry per line, and prints one JSON
-//              answer:
+//   a lookup   "-a -" and "-J" or "--print <fields>". Like the real tool it
+//              reads what to look up from standard input, one entry per
+//              line, and prints one JSON answer:
 //                "ytsearch<N>:<query>"            the search fixture
 //                a watch address                  the video fixture, with
 //                                                 the asked id swapped in
@@ -17,8 +17,16 @@
 //                /feed/playlists                  a list of playlists
 //                /playlist?list=<id>              a list of videos
 //              "--playlist-items <a>:<b>" keeps that range of a list.
-//   a report   "-a -" and "--simulate", without "-J": looks the video up and
-//              prints nothing (how a video is marked as watched).
+//              "-J" prints everything about what was looked up, and the
+//              stub takes it for a list only ("--flat-playlist"). The real
+//              tool's whole record of one video can be several times what
+//              the plugin reads of an answer, so a call that asks for it is
+//              turned away as a bad command line.
+//              "--print %(.{a,b,c})j" prints the fields named there, in
+//              that order, as one line. A field the answer lacks or holds
+//              as null is left out. This is how a video is looked up.
+//   a report   "-a -" and "--simulate", without either: looks the video up
+//              and prints nothing (how a video is marked as watched).
 //   an export  "--cookies-from-browser <name>+basictext:<profile>" and
 //              "--cookies <file>", no input: writes a cookie file of
 //              invented rows to <file> and, like the real tool run without
@@ -107,6 +115,7 @@ var WATCH = /^https:\/\/www\.youtube\.com\/watch\?v=([A-Za-z0-9_-]{11})(&list=RD
 var FEED = /^https:\/\/www\.youtube\.com\/feed\/(recommended|subscriptions|history|playlists)$/
 var LIST = /^https:\/\/www\.youtube\.com\/playlist\?list=([A-Za-z0-9_-]{2,64})$/
 var ITEMS = /^([0-9]+):([0-9]+)$/
+var FIELDS = /^%\(\.\{([A-Za-z_]+(?:,[A-Za-z_]+)*)\}\)j$/
 var BROWSER = /^[a-z]+\+basictext:(\/.*)$/
 
 var stub = lib.start("ytdlp")
@@ -125,12 +134,36 @@ function fixture(name) {
   return fs.readFileSync(path.join(FIXTURES, name), "utf8")
 }
 
+// The fields "--print" names, or null when the call does not print fields.
+// A template of any other shape is not one the stub knows.
+function printedFields() {
+  var found = FIELDS.exec(String(valueOf("--print")))
+  return found === null ? null : found[1].split(",")
+}
+
+var fields = printedFields()
+
 // JSON the way yt-dlp prints it: nothing outside ASCII is left unescaped.
-function dump(value) {
-  var text = JSON.stringify(value, null, 2).replace(/[\u007f-\uffff]/g, function(unit) {
+function ascii(text) {
+  return text.replace(/[\u007f-\uffff]/g, function(unit) {
     return "\\u" + unit.charCodeAt(0).toString(16).padStart(4, "0")
   })
-  return text + "\n"
+}
+
+function dump(value) {
+  return ascii(JSON.stringify(value, null, 2)) + "\n"
+}
+
+// What "--print" makes of an answer: the fields that were asked for, in the
+// order asked, as one line.
+function chosen(text) {
+  var whole = JSON.parse(text)
+  var kept = {}
+  fields.forEach(function(name) {
+    var held = Object.prototype.hasOwnProperty.call(whole, name) ? whole[name] : null
+    if (held !== null) kept[name] = held
+  })
+  return ascii(JSON.stringify(kept)) + "\n"
 }
 
 // Ends the process once everything written to standard output has left.
@@ -288,7 +321,8 @@ function ranged(text) {
   return dump(answer)
 }
 
-function answer(asked) {
+// Everything the stub knows about what was asked for, or null.
+function known(asked) {
   if (asked.kind === "video" && scenario.name === "moved") {
     return video(asked.id).split(MEDIA_HOST).join(MOVED_HOST)
   }
@@ -304,12 +338,18 @@ function answer(asked) {
   return null
 }
 
+// The same, as this call prints it.
+function answer(asked) {
+  var text = known(asked)
+  return text === null || fields === null ? text : chosen(text)
+}
+
 // size: 0, or the number of bytes the answer is padded to. The blanks go
 // in front of the final line break, where JSON allows them.
 function succeed(asked, size) {
   var text = answer(asked)
   if (text === null) { fail(asked.label + ": Unsupported URL"); return }
-  if (argv.indexOf("-J") === -1) { finish(0); return }
+  if (argv.indexOf("-J") === -1 && fields === null) { finish(0); return }
   if (size > text.length) text = text.slice(0, -1) + " ".repeat(size - text.length) + "\n"
   process.stdout.write(text)
   finish(0)
@@ -353,7 +393,7 @@ function respond(asked, jar) {
     fail(asked.label + ": " + unreachable, asked.kind === "search" ? listing : undefined)
   } else if (name === "unknown") fail(asked.label + ": Something the stub made up")
   else if (name === "wrong-id") {
-    process.stdout.write(video("ZZZZZZZZZZZ"))
+    process.stdout.write(answer({ kind: "video", id: "ZZZZZZZZZZZ" }))
     finish(0)
   } else if (name === "garbage") {
     process.stdout.write("<html><body>not what was asked for</body></html>\n")
@@ -403,9 +443,17 @@ if (argv.indexOf("--cookies-from-browser") !== -1) {
     // Without these the real tool would not read standard input at all, or
     // would print nothing to read.
     var batch = argv.indexOf("-a")
-    var prints = argv.indexOf("-J") !== -1 || argv.indexOf("--simulate") !== -1
+    var whole = argv.indexOf("-J") !== -1
+    var prints = whole || fields !== null || argv.indexOf("--simulate") !== -1
     if (batch === -1 || argv[batch + 1] !== "-" || !prints) {
       process.stderr.write("Usage: yt-dlp [OPTIONS] URL [URL...]\n\nyt-dlp: error: no input was named\n")
+      process.exit(EXIT_USAGE)
+    }
+    // Not something the real tool says. It prints the whole record of a
+    // video when asked, and that is what must not be asked for.
+    if (whole && argv.indexOf("--flat-playlist") === -1) {
+      process.stderr.write("Usage: yt-dlp [OPTIONS] URL [URL...]\n\nyt-dlp: error: the stub prints the whole "
+        + "record of a list only; a video is looked up by its fields\n")
       process.exit(EXIT_USAGE)
     }
     process.stderr.write("Reading URLs from STDIN - EOF (Ctrl+D) to end:\n")

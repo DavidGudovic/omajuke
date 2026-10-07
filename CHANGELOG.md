@@ -2,6 +2,15 @@
 
 Every released version of OmaJuke, newest first. Only changes a user can see are listed.
 
+## 0.2.2 - 2026-10-07
+
+One fix, for videos that would not play.
+
+Fixed:
+
+- Videos with automatic captions (most spoken-word videos) failed to play with "yt-dlp returned
+  something unexpected": the lookup now asks yt-dlp only for the fields it uses.
+
 ## 0.2.1 - 2026-10-07
 
 Fixes found by looking at the panel on a real screen.

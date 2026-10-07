@@ -6,7 +6,7 @@ opened and no account is needed.
 
 ![The OmaJuke panel under its bar icon: search results, the playing track and the video window](preview.png)
 
-This is version 0.2.1. What it does:
+This is version 0.2.2. What it does:
 
 - Searches YouTube and lists up to 20 results with thumbnails.
 - Plays a result, or a YouTube video link pasted into the search field.
@@ -435,7 +435,7 @@ The answers:
 `status` answers one JSON object:
 
 ```json
-{ "version": "0.2.1", "state": "playing", "id": "AAAAAAAAAAA", "title": "Example title",
+{ "version": "0.2.2", "state": "playing", "id": "AAAAAAAAAAA", "title": "Example title",
   "channel": "Example channel", "position": 37.2, "duration": 213, "live": false, "volume": 70,
   "muted": false, "queueLength": 3, "queueIndex": 0, "video": "hidden", "output": "",
   "signedIn": false, "updatePending": false, "error": "" }

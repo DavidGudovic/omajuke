@@ -49,17 +49,36 @@ var FORMATS = {
   720: "bestvideo[height<=?720]+bestaudio/best",
   1080: "bestvideo[height<=?1080]+bestaudio/best"
 }
+// What a lookup asks yt-dlp to print about a video, written out a second
+// time: an object of these fields, as one line of JSON.
+var FIELDS = [
+  "id", "title", "fulltitle", "channel", "channel_id", "uploader", "uploader_id", "duration", "is_live",
+  "was_live", "live_status", "_type", "formats", "requested_formats", "format", "format_id", "ext",
+  "protocol", "http_headers", "extractor", "extractor_key", "webpage_url", "webpage_url_basename",
+  "webpage_url_domain", "original_url", "display_id", "chapters", "availability", "age_limit",
+  "release_timestamp", "start_time", "end_time", "acodec", "vcodec", "tbr", "abr", "vbr", "asr",
+  "audio_channels", "width", "height", "fps", "language", "epoch", "_version"
+]
+var PRINT = "%(.{" + FIELDS.join(",") + "})j"
+// The flags that make yt-dlp print everything it knows about a video.
+var WHOLE_RECORD = ["-J", "--dump-single-json", "-j", "--dump-json"]
 // Where the copy of the login stands in a call that uses the account.
 var COPY_SLOT = 1 + BASE.length + 1
 
 function resolveList(height) {
-  var own = ["--no-playlist", "-f", FORMATS[height], "-J", "-a", "-"]
+  var own = ["--no-playlist", "-f", FORMATS[height], "--print", PRINT, "-a", "-"]
   return ["/usr/bin/yt-dlp"].concat(BASE, SIGNED_OUT, own)
 }
 
 function accountResolveList(height) {
-  var own = ["--no-playlist", "-f", FORMATS[height], "-J", "-a", "-"]
+  var own = ["--no-playlist", "-f", FORMATS[height], "--print", PRINT, "-a", "-"]
   return ["/usr/bin/yt-dlp"].concat(BASE, WITH_COPY, own)
+}
+
+// True for the names under which everySignedOut and everyAccount keep the
+// lookup of one video.
+function isLookup(name) {
+  return name.indexOf("resolve") === 0 || name.indexOf("account") === 0
 }
 
 var CURL = [
@@ -301,13 +320,90 @@ test("every call is the tool, base, how it is signed in, and its own flags, in t
     assert.strictEqual(argv[0], "/usr/bin/yt-dlp", name)
     assert.deepStrictEqual(argv.slice(1, 1 + BASE.length), BASE, name)
     assert.deepStrictEqual(argv.slice(1 + BASE.length, 3 + BASE.length), SIGNED_OUT, name)
-    assert.deepStrictEqual(argv.slice(-3), ["-J", "-a", "-"], name + " reads its input from stdin")
+    assert.deepStrictEqual(argv.slice(-2), ["-a", "-"], name + " reads its input from stdin")
+    var printing = isLookup(name) ? ["--print", PRINT] : ["-J"]
+    assert.deepStrictEqual(argv.slice(-2 - printing.length, -2), printing, name + " prints one JSON answer")
   })
   each(everyAccount(TOOLS, paths, COPY), function(argv, name) {
     assert.strictEqual(argv[0], "/usr/bin/yt-dlp", name)
     assert.deepStrictEqual(argv.slice(1, 1 + BASE.length), BASE, name)
     assert.deepStrictEqual(argv.slice(1 + BASE.length, 3 + BASE.length), WITH_COPY, name)
     assert.deepStrictEqual(argv.slice(-2), ["-a", "-"], name + " reads its input from stdin")
+  })
+})
+
+// The whole record of a video with automatic captions is more than ten
+// megabytes, nearly all of it the list of captions, and an answer is read
+// up to Const.LIMITS.resolveBytes: asked for, it made such a video
+// unplayable. A lookup therefore names the fields it wants.
+test("a lookup asks for named fields and never for the whole record of a video", function() {
+  var lookups = 0
+  each(everyYtArgv(TOOLS, paths, COPY), function(argv, name) {
+    if (!isLookup(name)) {
+      // Everything else lists entries without looking them up, or prints
+      // nothing at all.
+      assert.strictEqual(argv.indexOf("--print"), -1, name)
+      assert.strictEqual(argv.indexOf("-J") !== -1, argv.indexOf("--flat-playlist") !== -1, name)
+      return
+    }
+    lookups += 1
+    WHOLE_RECORD.forEach(function(flag) { assert.strictEqual(argv.indexOf(flag), -1, name + ": " + flag) })
+    assert.strictEqual(argv.indexOf("--flat-playlist"), -1, name)
+    assert.strictEqual(count(argv, "--print"), 1, name)
+    assert.strictEqual(argv[argv.indexOf("--print") + 1], PRINT, name)
+  })
+  assert.strictEqual(lookups, 6)
+})
+
+test("the fields of a lookup are plain names in one constant text", function() {
+  assert.ok(/^%\(\.\{[a-z_]+(,[a-z_]+)*\}\)j$/.test(PRINT))
+  assert.strictEqual(new Set(FIELDS).size, FIELDS.length)
+  // The parts of the record that grow with the video and are never read:
+  // captions above all, then pictures, texts and what viewers wrote.
+  var unread = [
+    "automatic_captions", "subtitles", "requested_subtitles", "thumbnails", "thumbnail", "description",
+    "comments", "heatmap", "tags", "categories"
+  ]
+  unread.forEach(function(name) { assert.strictEqual(FIELDS.indexOf(name), -1, name) })
+  // The same text whatever is passed in: no argument reaches it.
+  var odd = [undefined, null, 480, "1080", "x})j --exec x", {}, ["id"]]
+  odd.forEach(function(value) {
+    var argv = YtArgs.resolve(TOOLS, paths, value, value)
+    assert.strictEqual(argv[argv.indexOf("--print") + 1], PRINT, String(value))
+  })
+})
+
+test("every field a track is read from is among the fields of a lookup", function() {
+  // The video fixture holds what yt-dlp knows; cut down to the fields a
+  // lookup asks for, it must give the same track and the same video
+  // address. A field read in lib/Track.js and missing from the list would
+  // show here as a different answer.
+  var Track = load.lib("Track")
+  var text = fs.readFileSync(path.join(__dirname, "..", "fixtures", "video.json"), "utf8")
+  var whole = JSON.parse(text)
+  var kept = {}
+  FIELDS.forEach(function(name) {
+    if (Object.prototype.hasOwnProperty.call(whole, name) && whole[name] !== null) kept[name] = whole[name]
+  })
+  var line = JSON.stringify(kept).replace(/[\u007f-\uffff]/g, function(unit) {
+    return "\\u" + unit.charCodeAt(0).toString(16).padStart(4, "0")
+  }) + "\n"
+  var id = whole.id
+  var full = Track.fromInfoJson(text, id)
+  assert.strictEqual(full.ok, true)
+  assert.notStrictEqual(full.videoUrl, "")
+  assert.deepStrictEqual(Track.fromInfoJson(line, id), full)
+  assert.ok(Object.keys(kept).length < Object.keys(whole).length)
+  assert.ok(Object.prototype.hasOwnProperty.call(whole, "automatic_captions"))
+  assert.strictEqual(line.indexOf("automatic_captions"), -1)
+  // Each name the reader asks the answer for, as written in its source.
+  var source = fs.readFileSync(path.join(__dirname, "..", "..", "lib", "Track.js"), "utf8")
+  var reader = source.slice(source.indexOf("function fromInfoJson"), source.indexOf("// A track read back"))
+  var calls = reader.match(/_own\(info, "[^"]+"\)/g) || []
+  var read = calls.map(function(call) { return call.split("\"")[1] })
+  assert.ok(read.length >= 8, "the reader was found")
+  read.concat(["channel", "uploader"]).forEach(function(name) {
+    assert.ok(FIELDS.indexOf(name) !== -1, name)
   })
 })
 
@@ -406,7 +502,7 @@ test("nothing varies but the tool, the cache folder, the copy and the format", f
 
 test("every element is a constant, the tool, the cache folder or the copy", function() {
   var allowed = SEARCH.concat(["--no-playlist", "-f", FORMATS[480], FORMATS[720], FORMATS[1080],
-    "--playlist-items", "1:25"])
+    "--playlist-items", "1:25", "--print", PRINT])
   each(everySignedOut(TOOLS, paths), function(argv, name) {
     argv.forEach(function(part) {
       assert.ok(allowed.indexOf(part) !== -1, name + " holds something else: " + part.slice(0, 60))
@@ -428,7 +524,8 @@ test("what is never passed to yt-dlp", function() {
     "--config-locations", "--config-location", "--load-info-json", "--write-info-json", "--remote-components",
     "--proxy", "--plugin-dirs", "--update", "-U", "--update-to", "--js-runtimes",
     "--extractor-args", "--user-agent", "--add-headers", "--", "--batch-file", "--username", "--password",
-    "-u", "-p", "--twofactor", "--print", "--print-to-file", "--dump-json", "-j", "--write-comments"
+    "-u", "-p", "--twofactor", "--print-to-file", "--dump-json", "-j", "--dump-single-json",
+    "--write-comments", "--write-subs", "--write-auto-subs", "--no-simulate"
   ]
   each(everyYtArgv(TOOLS, paths, COPY), function(argv, name) {
     never.forEach(function(flag) { assert.strictEqual(argv.indexOf(flag), -1, name + ": " + flag) })

@@ -192,7 +192,8 @@ test("fixtures: video.json resolves to the track the first service case plays", 
 })
 
 test("fixtures: video.json answers for any id once the id is swapped in as text", function() {
-  // What the yt-dlp stub does: no parsing, so the text stays pure ASCII.
+  // What the yt-dlp stub does, before it picks the fields that were asked
+  // for: no parsing, so the text stays pure ASCII.
   var text = fixture("video.json").split(ID).join(OTHER)
   assert.deepStrictEqual(Track.fromInfoJson(text, OTHER).track.id, OTHER)
   assert.deepStrictEqual(Track.fromInfoJson(text, ID), NO)

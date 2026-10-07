@@ -205,7 +205,9 @@ QtObject {
         "thumbs 700", "ytcache 700"], "files: the private folders, one info file, the socket")
       h.check(out.indexOf(root.id) === -1, "files: no name holds the id")
       var text = h.readFile(paths.infoDir + "/1.json")
-      h.check(text === h.readFile(h.repo + "/tests/fixtures/video.json"), "files: the lookup, as it came")
+      var asked = YtArgs.resolve(h.tools, paths, 720)
+      h.check(text === h.printed(asked, h.readFile(h.repo + "/tests/fixtures/video.json")),
+        "files: the lookup, as it came")
       root.next()
     })
   }

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "davidgudovic.omajuke",
   "name": "OmaJuke",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "author": "David Gudovic",
   "license": "MIT",
   "description": "YouTube in the bar: search, queue and play through mpv, with no browser and no account needed. Optional pinned video window, shortcuts, audio output choice, sponsor skipping and sign-in. Uses mpv and yt-dlp, which ship with Omarchy.",

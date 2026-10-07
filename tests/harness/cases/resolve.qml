@@ -3,6 +3,7 @@ import "../../../lib/Const.js" as Const
 import "../../../lib/Env.js" as Env
 import "../../../lib/Errors.js" as Errors
 import "../../../lib/Sh.js" as Sh
+import "../../../lib/YtArgs.js" as YtArgs
 
 // core/Resolver.qml against the yt-dlp stub and the real file tools: the
 // lookup of a video, the private file its answer is kept in, the cache of
@@ -72,14 +73,26 @@ QtObject {
     return root.fs.paths.infoDir + "/" + n + ".json"
   }
 
-  // The flags behind the tool, written out a second time.
+  // The flags behind the tool, written out a second time. The fields a
+  // lookup asks to have printed are not: vectors_yt compares them name by
+  // name, and here they are taken from the builder.
   function flags(height) {
+    var built = YtArgs.resolve({ ytdlp: "/usr/bin/yt-dlp" }, root.fs.paths, 720)
     return [
       "--ignore-config", "--no-plugin-dirs", "--cache-dir", root.fs.paths.ytCacheDir, "--color", "never",
       "--no-cookies-from-browser", "--no-mark-watched", "--no-remote-components", "--socket-timeout", "10",
       "--no-cookies", "--no-warnings", "--no-playlist", "-f",
-      "bestvideo[height<=?" + height + "]+bestaudio/best", "-J", "-a", "-"
+      "bestvideo[height<=?" + height + "]+bestaudio/best", "--print", built[built.indexOf("--print") + 1],
+      "-a", "-"
     ]
+  }
+
+  // What the stub answers a lookup of id with: of the video fixture, with
+  // that id swapped in, the fields a lookup asks for.
+  function answer(id) {
+    var h = root.h
+    var whole = h.readFile(h.repo + "/tests/fixtures/video.json").split(root.fixtureId).join(id)
+    return h.printed(root.flags(720), whole)
   }
 
   function wrapper(seconds) {
@@ -182,9 +195,14 @@ QtObject {
       result.entry.n = 99
       result.entry.track.title = "changed"
       root.checkEntry("first, after a write to it", root.resolver.entry(id), id, 1)
-      var fixture = h.readFile(h.repo + "/tests/fixtures/video.json")
-      h.check(fixture.length > 1000 && h.readFile(root.infoFile(1)) === fixture,
+      var answer = root.answer(id)
+      h.check(answer.length > 1000 && h.readFile(root.infoFile(1)) === answer,
         "first: the file holds yt-dlp's answer, byte for byte")
+      // The fixture lists captions, as the whole record of a real video
+      // does at great length. They were not asked for and are not there.
+      var whole = h.readFile(h.repo + "/tests/fixtures/video.json")
+      h.equal([whole.indexOf("automatic_captions") !== -1, answer.indexOf("automatic_captions")], [true, -1],
+        "first: and it holds the fields that were asked for, not the whole record")
       root.listing(function(found) {
         h.equal(found, root.files([1]), "first: one file, named by the counter, mode 600")
         root.next()
@@ -198,6 +216,8 @@ QtObject {
     var record = h.log("ytdlp")
     h.equal(record.length, 1, "recorded: yt-dlp ran once")
     h.equal(record[0].argv, root.flags(720), "recorded: the arguments are the constant list")
+    h.equal([record[0].argv.indexOf("-J"), record[0].argv.indexOf("--dump-single-json")], [-1, -1],
+      "recorded: the whole record of the video is not asked for")
     h.equal(record[0].stdin, "https://www.youtube.com/watch?v=" + id + "\n", "recorded: the address on stdin")
     h.equal(record[0].env, ["DENO_DIR", "DENO_NO_UPDATE_CHECK", "HOME", "LANG", "PATH", "XDG_RUNTIME_DIR"],
       "recorded: the network profile and nothing else")
@@ -299,8 +319,8 @@ QtObject {
     root.resolver.settings = { maxHeight: 1080, preload: false }
     root.lookUp("1080", second, 3, function() {
       h.equal(h.log("ytdlp")[root.starts() - 1].argv, root.flags(1080), "1080: the larger format")
-      var swapped = h.readFile(h.repo + "/tests/fixtures/video.json").split(root.fixtureId).join(second)
-      h.check(h.readFile(root.infoFile(3)) === swapped, "1080: the file is the answer for that id")
+      h.check(h.readFile(root.infoFile(3)) === root.answer(second),
+        "1080: the file is the answer for that id")
       root.resolver.settings = { maxHeight: "480]+bestaudio/best --exec x", preload: false }
       root.lookUp("odd height", third, 4, function() {
         h.equal(h.log("ytdlp")[root.starts() - 1].argv, root.flags(720), "odd height: the middle format")
@@ -495,8 +515,10 @@ QtObject {
       // Exit code 0, and something that is not the answer that was asked for.
       ["garbage", "E_BAD_OUTPUT"], ["non-ascii", "E_BAD_OUTPUT"], ["wrong-id", "E_BAD_OUTPUT"],
       ["empty", "E_BAD_OUTPUT"],
-      // More output than an answer may have: without end, and by one byte.
-      ["flood", "E_BAD_OUTPUT"], ["big:" + (Const.LIMITS.resolveBytes + 1), "E_BAD_OUTPUT"]
+      // More output than an answer may have: without end, by one byte, and
+      // several times over, as the whole record of a video can be.
+      ["flood", "E_BAD_OUTPUT"], ["big:" + (Const.LIMITS.resolveBytes + 1), "E_BAD_OUTPUT"],
+      ["big:" + 3 * Const.LIMITS.resolveBytes, "E_BAD_OUTPUT"]
     ], 0)
   }
 
@@ -764,8 +786,7 @@ QtObject {
       h.exec(size, null, function(code, out) {
         h.equal(out, "600 4194304\n", "largest: every byte is in the file")
         var text = h.readFile(root.infoFile(17))
-        var fixture = h.readFile(h.repo + "/tests/fixtures/video.json").split(root.fixtureId).join(id)
-        h.check(text.length === Const.LIMITS.resolveBytes && text.indexOf(fixture.slice(0, -1)) === 0,
+        h.check(text.length === Const.LIMITS.resolveBytes && text.indexOf(root.answer(id).slice(0, -1)) === 0,
           "largest: and it is the answer")
         root.resolver.purge([])
         root.settled(function() { root.next() })
@@ -817,8 +838,8 @@ QtObject {
             root.settled(function() {
               var tags = h.jobs().slice(before[1]).map(function(job) { return job.tag })
               h.equal(tags, ["resolve", "resolve"], "picture: nothing was written or removed")
-              var fixture = h.readFile(h.repo + "/tests/fixtures/video.json").split(root.fixtureId).join(id)
-              h.check(h.readFile(root.infoFile(18)) === fixture, "picture: the file of the play is as it was")
+              h.check(h.readFile(root.infoFile(18)) === root.answer(id),
+                "picture: the file of the play is as it was")
               root.listing(function(found) {
                 h.equal(found, root.files([18]), "picture: one file, as before")
                 var bad = []

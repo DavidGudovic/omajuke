@@ -16,7 +16,7 @@
 // running service: a difference means the plugin was updated and the shell
 // not yet restarted, and the view then shows the restart notice and nothing
 // else.
-var VERSION = "0.2.1"
+var VERSION = "0.2.2"
 
 // ---- Glyphs ----
 

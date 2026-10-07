@@ -28,9 +28,17 @@ QtObject {
     "--socket-timeout", "10", "--no-cookies", "--no-warnings"
   ]
 
+  // What a lookup asks yt-dlp to print about a video, written out a second
+  // time: an object of these fields, as one line of JSON.
+  readonly property string fields: "%(.{id,title,fulltitle,channel,channel_id,uploader,uploader_id,duration,"
+    + "is_live,was_live,live_status,_type,formats,requested_formats,format,format_id,ext,protocol,"
+    + "http_headers,extractor,extractor_key,webpage_url,webpage_url_basename,webpage_url_domain,"
+    + "original_url,display_id,chapters,availability,age_limit,release_timestamp,start_time,end_time,"
+    + "acodec,vcodec,tbr,abr,vbr,asr,audio_channels,width,height,fps,language,epoch,_version})j"
+
   function resolveList(height) {
     var format = "bestvideo[height<=?" + height + "]+bestaudio/best"
-    return root.common.concat(["--no-playlist", "-f", format, "-J", "-a", "-"])
+    return root.common.concat(["--no-playlist", "-f", format, "--print", root.fields, "-a", "-"])
   }
 
   function checkYtArgs(h) {
@@ -39,6 +47,17 @@ QtObject {
     h.equal(YtArgs.resolve(root.tools, root.paths, 480), root.resolveList(480), "resolve at 480")
     h.equal(YtArgs.resolve(root.tools, root.paths, 720), root.resolveList(720), "resolve at 720")
     h.equal(YtArgs.resolve(root.tools, root.paths, 1080), root.resolveList(1080), "resolve at 1080")
+    // Everything yt-dlp knows about a video with captions is more than an
+    // answer may hold, so a lookup names its fields and never asks for all.
+    var whole = ["-J", "--dump-single-json", "-j", "--dump-json"]
+    var copy = "/run/user/1000/omajuke/jar/7.txt"
+    var lookups = [YtArgs.resolve(root.tools, root.paths, 720),
+      YtArgs.resolveWithAccount(root.tools, root.paths, 720, copy)]
+    for (var n = 0; n < lookups.length; n++) {
+      var asked = whole.filter(function(flag) { return lookups[n].indexOf(flag) !== -1 })
+      h.equal(asked, [], "lookup " + n + ": the whole record is not asked for")
+      h.equal(lookups[n].slice(-4), ["--print", root.fields, "-a", "-"], "lookup " + n + ": named fields are")
+    }
     h.equal(YtArgs.base(root.paths), root.common.slice(1, 12), "base: the part every call shares")
     var odd = [undefined, null, 0, 360, 2160, "480", "1080", "best --exec x", 720.5, true, [480], {}]
     for (var i = 0; i < odd.length; i++) {

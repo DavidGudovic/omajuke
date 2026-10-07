@@ -1,5 +1,6 @@
 import QtQuick
 import "../../../lib/Const.js" as Const
+import "../../../lib/YtArgs.js" as YtArgs
 
 // core/Resolver.qml looking videos up ahead of a play, against the yt-dlp
 // stub and the real file tools: for the search result the highlight rests
@@ -63,13 +64,16 @@ QtObject {
     return id
   }
 
-  // The flags behind the tool, written out a second time.
+  // The flags behind the tool, written out a second time. The fields a
+  // lookup asks to have printed are not: vectors_yt compares them name by
+  // name, and here they are taken from the builder.
   function flags() {
+    var built = YtArgs.resolve({ ytdlp: "/usr/bin/yt-dlp" }, root.fs.paths, 720)
     return [
       "--ignore-config", "--no-plugin-dirs", "--cache-dir", root.fs.paths.ytCacheDir, "--color", "never",
       "--no-cookies-from-browser", "--no-mark-watched", "--no-remote-components", "--socket-timeout", "10",
       "--no-cookies", "--no-warnings", "--no-playlist", "-f", "bestvideo[height<=?720]+bestaudio/best",
-      "-J", "-a", "-"
+      "--print", built[built.indexOf("--print") + 1], "-a", "-"
     ]
   }
 

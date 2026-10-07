@@ -264,6 +264,25 @@ ShellRoot {
       return text
     }
 
+    // What the yt-dlp stub prints for a lookup that asks for fields, worked
+    // out a second time. argv is the command line of the lookup, with
+    // "--print %(.{a,b,c})j" in it, and record the JSON text of everything
+    // the stub knows. The answer is those fields in the order asked,
+    // without the ones the record lacks or holds as null, on one line and
+    // with nothing outside ASCII left unescaped.
+    function printed(argv, record) {
+      var names = argv[argv.indexOf("--print") + 1].slice(4, -3).split(",")
+      var whole = JSON.parse(record)
+      var kept = {}
+      for (var i = 0; i < names.length; i++) {
+        var held = whole[names[i]]
+        if (held !== undefined && held !== null) kept[names[i]] = held
+      }
+      return JSON.stringify(kept).replace(/[\u007f-\uffff]/g, function(unit) {
+        return "\\u" + ("000" + unit.charCodeAt(0).toString(16)).slice(-4)
+      }) + "\n"
+    }
+
     // FileView does not write an empty text at all: the file would keep
     // what it had, or not come to exist. A case that asks for one is told,
     // and makes it with exec instead.
