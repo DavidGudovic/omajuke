@@ -149,6 +149,16 @@ Item {
     if (root.store) root.store.patch({ video: {} })
   }
 
+  // The user picked another size or corner for the window. A place the
+  // window was left in would overrule that choice, so every remembered
+  // place is forgotten, and a window that is open moves to the new place.
+  // Arrow keys step through the corners one press at a time, so the move
+  // waits for the last press of a burst.
+  function placementChosen() {
+    root.resetPlacement()
+    if (root._wanted && (root._window || root._opening)) moveTimer.restart()
+  }
+
   // ---- The rule ----
 
   function _usable() {
@@ -320,6 +330,29 @@ Item {
     root.player.setKeepAwake(false)
   }
 
+  // ---- Moving ----
+
+  // Moves the open window to where the settings put it now. A rule acts
+  // only when a window opens, and the rule is the one way OmaJuke places a
+  // window, so the window is closed and opened again under a fresh rule:
+  // the same steps as hiding it and showing it, without giving up the wish
+  // and without remembering the old place. The sound plays on throughout.
+  function _move() {
+    if (!root._wanted || !root._usable()) return
+    // A window that is still opening or closing is moved once it has.
+    if (root._opening || root._closing) {
+      moveTimer.restart()
+      return
+    }
+    if (!root._window) return
+    root._pass += 1
+    root._selected = false
+    loadingTimer.stop()
+    root.player.selectVideo(0)
+    root._dropWindow()
+    root._attach(false)
+  }
+
   // ---- Closing ----
 
   // The end of the wish. byWindow is true when the user closed the window
@@ -469,5 +502,12 @@ Item {
     id: reloadTimer
     interval: Const.TIMEOUTS.reloadMs
     onTriggered: root._reregister()
+  }
+
+  // Runs only after the user picked a place while the window is open.
+  Timer {
+    id: moveTimer
+    interval: Const.TIMEOUTS.moveMs
+    onTriggered: root._move()
   }
 }

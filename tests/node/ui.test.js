@@ -214,10 +214,11 @@ test("the account page says what a sign-in keeps, where, at what risk, and what 
   })
 })
 
-test("the feed chips are the home list and the five lists the service knows", function() {
+test("the feed chips are the home list and four of the lists the service knows", function() {
   var FeedUrls = load.lib("FeedUrls")
   assert.strictEqual(Ui.FEEDS[0].value, "")
-  assert.deepStrictEqual(Ui.FEEDS.slice(1).map(function(chip) { return chip.value }), FeedUrls.KINDS.slice())
+  assert.deepStrictEqual(Ui.FEEDS.slice(1).map(function(chip) { return chip.value }),
+    FeedUrls.KINDS.filter(function(kind) { return kind !== "history" }))
   Ui.FEEDS.forEach(function(chip) {
     assert.deepStrictEqual(Object.keys(chip), ["value", "label"])
     assert.ok(chip.label.length > 0 && chip.label.length <= 13, chip.label)
@@ -226,7 +227,7 @@ test("the feed chips are the home list and the five lists the service knows", fu
   assert.strictEqual(new Set(Ui.FEEDS.map(function(chip) { return chip.label })).size, Ui.FEEDS.length)
   // Left and Right walk the chips and stop at the ends.
   assert.strictEqual(Ui.stepChoice(Ui.FEEDS, "", 1, false), "foryou")
-  assert.strictEqual(Ui.stepChoice(Ui.FEEDS, "history", 1, false), "history")
+  assert.strictEqual(Ui.stepChoice(Ui.FEEDS, "playlists", 1, false), "playlists")
   assert.strictEqual(Ui.stepChoice(Ui.FEEDS, "foryou", -1, false), "")
 })
 

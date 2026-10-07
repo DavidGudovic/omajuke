@@ -138,10 +138,13 @@ QtObject {
   // "ok", "version", "config-errors" or "no-hyprland".
   property string shortcutsGate: "ok"
   property bool shortcutsBusy: false
+  // The first-use question whether to turn shortcuts on is waiting.
+  property bool shortcutsPrompt: false
 
   function refreshShortcuts() { return root._record("refreshShortcuts", [], true) }
   function assignShortcut(action, combo) { return root._record("assignShortcut", [action, combo], true) }
   function unassignShortcut(action) { return root._record("unassignShortcut", [action], true) }
+  function answerShortcutsPrompt(enable) { return root._record("answerShortcutsPrompt", [enable], true) }
   function copyShortcutLine(action, combo) { return root._record("copyShortcutLine", [action, combo], true) }
   // "" is what the service answers for a key press that is no shortcut.
   function comboFromKeyEvent(key, modifiers) {

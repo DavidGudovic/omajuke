@@ -60,10 +60,10 @@ Not trusted, and treated as hostile input:
 - The files it reads back: `state.json` and its own entry in the shell's `shell.json`.
 
 Stored: `state.json`, mode 0600 in a 0700 folder, with the volume, the mute state, your answer to
-the proxy notice, three privacy choices, the shortcuts you assigned, the audio output you chose,
-where you left the video window and, unless you switched history off, up to 30 recently played
-tracks and the queue. Short-lived files in a private folder in memory. Ten settings in the
-shell's own configuration. Only if you sign in: `cookies.txt`, mode 0600 in a 0700 folder, which
+the proxy notice, three privacy choices, the shortcuts you assigned and your answer to the
+question about them, the audio output you chose, where you left the video window and, unless you
+switched history off, up to 30 recently played tracks and the queue. Short-lived files in a
+private folder in memory. Ten settings in the shell's own configuration. Only if you sign in: `cookies.txt`, mode 0600 in a 0700 folder, which
 is a credential for your YouTube account.
 
 Leaves the machine: your search text and the videos you play, queue next or preload go to

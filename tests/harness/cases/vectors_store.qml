@@ -99,6 +99,10 @@ QtObject {
     var notAscii = 0
     var changed = 0
     var costly = 0
+    // What the file takes with an empty text: each unit is counted on top.
+    var bare = StateFile.serialize(StateFile.withChanges(StateFile.defaults(), {
+      shortcuts: { panel: "", video: "", output: "", dirty: true }
+    }), false).length
     for (var start = 0; start < 0x10000; start += 64) {
       var text = ""
       for (var code = start; code < start + 64; code++) {
@@ -109,7 +113,7 @@ QtObject {
       })
       var written = StateFile.serialize(state, false)
       if (!root.isAscii(written)) notAscii++
-      if (written.length > 160 + 6 * text.length) costly++
+      if (written.length > bare + 6 * text.length) costly++
       var read = StateFile.parse(written)
       if (read.ok !== true || read.state.shortcuts.panel !== text) changed++
     }

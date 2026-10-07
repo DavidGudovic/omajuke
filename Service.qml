@@ -158,6 +158,11 @@ Item {
   // config-errors or no-hyprland.
   readonly property string shortcutsGate: shortcutKeys.gate
   readonly property bool shortcutsBusy: shortcutKeys.busy
+  // True while the panel may ask, once, whether to turn shortcuts on: no
+  // action has one and the question was never answered. Not asked outside
+  // a Hyprland session, nor once a look found Hyprland unable to take one.
+  readonly property bool shortcutsPrompt: root.ready && shortcutKeys.firstUse && hyprCtl.hasSession()
+    && shortcutKeys.gate === "ok"
 
   // ---- Audio output ----
 
@@ -450,9 +455,12 @@ Item {
     thumbnails.reportError(id)
   }
 
-  // Changes one setting. Known keys and the values they accept only.
+  // Changes one setting. Known keys and the values they accept only. A new
+  // size or corner for the video window also moves a window that is open.
   function setSetting(key: string, value: var): bool {
-    return settingsStore.set(key, value)
+    var changed = settingsStore.set(key, value)
+    if (changed && root.ready && (key === "videoCorner" || key === "videoSize")) videoWindow.placementChosen()
+    return changed
   }
 
   // Every panel reports its opening and its closing.
@@ -518,6 +526,13 @@ Item {
 
   function unassignShortcut(action: string): bool {
     return root.ready && shortcutKeys.unassign(action)
+  }
+
+  // The answer to shortcutsPrompt. It is not asked again either way; yes
+  // assigns to each action the free key its row suggests, after a fresh
+  // look at the compositor's list.
+  function answerShortcutsPrompt(enable: bool): bool {
+    return root.ready && shortcutKeys.answerPrompt(enable)
   }
 
   // Puts the line for the user's own key configuration on the clipboard.

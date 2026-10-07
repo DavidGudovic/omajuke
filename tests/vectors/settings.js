@@ -499,7 +499,82 @@ var CASES = [
   // What is not a change of a setting is not waited for.
   { fn: "unsettled", args: [{ volume: 5, evenVolume: "maybe", id: _ME }, {}, {}], expect: {} },
   { fn: "unsettled", args: [_inheriting({ evenVolume: true }), {}, {}], expect: {} },
-  { fn: "unsettled", args: [[true], {}, {}], expect: {} }
+  { fn: "unsettled", args: [[true], {}, {}], expect: {} },
+  // Arrow keys step through a choice faster than the host writes: the entry
+  // shows one of our own earlier changes, and the newest one stays.
+  { fn: "unsettled",
+    args: [{ videoCorner: "bottom-left" }, { videoCorner: "top-right" }, { videoCorner: "bottom-right" },
+      { videoCorner: ["top-right"] }],
+    expect: { videoCorner: "bottom-left" } },
+  { fn: "unsettled",
+    args: [{ maxHeight: 1080 }, { maxHeight: "720" }, { maxHeight: 480 }, { maxHeight: [720] }],
+    expect: { maxHeight: 1080 } },
+  // Somebody else's value is still the entry's, earlier changes or not.
+  { fn: "unsettled",
+    args: [{ videoCorner: "bottom-left" }, { videoCorner: "top-left" }, { videoCorner: "bottom-right" },
+      { videoCorner: ["top-right"] }],
+    expect: {} },
+  // Earlier changes of another key, or a list that is no list, say nothing.
+  { fn: "unsettled",
+    args: [{ videoCorner: "bottom-left" }, { videoCorner: "top-right" }, {}, { videoSize: ["top-right"] }],
+    expect: {} },
+  { fn: "unsettled",
+    args: [{ videoCorner: "bottom-left" }, { videoCorner: "top-right" }, {}, { videoCorner: "top-right" }],
+    expect: {} },
+  { fn: "unsettled",
+    args: [{ videoCorner: "bottom-left" }, { videoCorner: "top-right" }, {}, null], expect: {} },
+
+  // Stepping A, B and back to A: the first A the host shows is the earlier
+  // one, and the newest A still waits behind B.
+  { fn: "unsettled",
+    args: [{ videoCorner: "top-left" }, { videoCorner: "top-left" }, { videoCorner: "bottom-right" },
+      { videoCorner: ["top-left", "bottom-left"] }],
+    expect: { videoCorner: "top-left" } },
+  { fn: "unsettled",
+    args: [{ videoCorner: "top-left" }, { videoCorner: "bottom-left" }, { videoCorner: "top-left" },
+      { videoCorner: ["bottom-left"] }],
+    expect: { videoCorner: "top-left" } },
+  { fn: "unsettled",
+    args: [{ videoCorner: "top-left" }, { videoCorner: "top-left" }, { videoCorner: "bottom-left" }, {}],
+    expect: {} },
+
+  // ---- echoed: the earlier changes the host has not shown yet ----
+  { fn: "echoed", args: [{}, {}], expect: {} },
+  { fn: "echoed", args: [null, null], expect: {} },
+  { fn: "echoed", args: [{ videoCorner: ["top-left", "bottom-left"] }, { videoCorner: "top-left" }],
+    expect: { videoCorner: ["bottom-left"] } },
+  { fn: "echoed", args: [{ videoCorner: ["bottom-left"] }, { videoCorner: "bottom-left" }], expect: {} },
+  // Shown out of order: everything before the one shown is behind the host too.
+  { fn: "echoed", args: [{ videoCorner: ["top-left", "bottom-left", "top-right"] },
+    { videoCorner: "bottom-left" }], expect: { videoCorner: ["top-right"] } },
+  // Spelled differently by the host, it is still the same change.
+  { fn: "echoed", args: [{ maxHeight: [720, 480] }, { maxHeight: "720" }], expect: { maxHeight: [480] } },
+  // A value that is none of ours leaves the list as it is.
+  { fn: "echoed", args: [{ videoCorner: ["top-left"] }, { videoCorner: "top-right" }],
+    expect: { videoCorner: ["top-left"] } },
+  { fn: "echoed", args: [{ videoCorner: ["top-left"] }, {}], expect: { videoCorner: ["top-left"] } },
+  // What is not a setting, or a list that is no list, is dropped.
+  { fn: "echoed", args: [{ volume: [5], videoCorner: "top-left" }, {}], expect: {} },
+
+  // ---- earlierSent: what is remembered of earlier changes ----
+  { fn: "earlierSent", args: [{}, {}, "videoCorner"], expect: {} },
+  { fn: "earlierSent", args: [null, null, ""], expect: {} },
+  { fn: "earlierSent", args: [{}, { videoCorner: "top-right" }, "videoCorner"],
+    expect: { videoCorner: ["top-right"] } },
+  { fn: "earlierSent",
+    args: [{ videoCorner: ["top-right"] }, { videoCorner: "bottom-left" }, "videoCorner"],
+    expect: { videoCorner: ["top-right", "bottom-left"] } },
+  // Another key changes: the lists stay as they are.
+  { fn: "earlierSent",
+    args: [{ videoCorner: ["top-right"] }, { videoCorner: "bottom-left" }, "videoSize"],
+    expect: { videoCorner: ["top-right"] } },
+  // A key that is no longer pending is forgotten, and so is what is not a setting.
+  { fn: "earlierSent", args: [{ videoCorner: ["top-right"] }, { videoSize: "half" }, ""], expect: {} },
+  { fn: "earlierSent", args: [{ volume: [1] }, { volume: 2 }, "volume"], expect: {} },
+  // Only plain values are kept.
+  { fn: "earlierSent",
+    args: [{ videoCorner: ["top-right", { a: 1 }, null] }, { videoCorner: "bottom-left" }, ""],
+    expect: { videoCorner: ["top-right"] } }
 ]
 
 if (typeof module !== "undefined") {

@@ -90,8 +90,8 @@ function freezeDeep(value) {
 
 test("the module exports what the store and the state file use", function() {
   assert.deepStrictEqual(Object.keys(Settings).sort(), [
-    "CONSERVATIVE", "CORNERS", "DEFAULTS", "MIRRORED", "choices", "coerce", "extract", "overlay", "unsettled",
-    "withChange"
+    "CONSERVATIVE", "CORNERS", "DEFAULTS", "MIRRORED", "SENT_MAX", "choices", "coerce", "earlierSent",
+    "echoed", "extract", "overlay", "unsettled", "withChange"
   ])
 })
 

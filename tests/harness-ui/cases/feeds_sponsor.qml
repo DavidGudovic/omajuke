@@ -14,7 +14,7 @@ QtObject {
   property var body: null
 
   readonly property var chipLabels: [
-    "Home", "For you", "Subscriptions", "Watch later", "Playlists", "History"
+    "Home", "For you", "Subscriptions", "Watch later", "Playlists"
   ]
   readonly property var recents: [
     { id: "AAAAAAAAAAA", title: "Recent one", channel: "Channel A", duration: 61, live: false },
@@ -136,7 +136,7 @@ QtObject {
         h.mock.signedIn = true
       },
       function() {
-        h.equal(root.chipTexts(h), root.chipLabels, "signed in: the home list and the five lists as chips")
+        h.equal(root.chipTexts(h), root.chipLabels, "signed in: the home list and four lists as chips")
         h.equal(root.marked(h), ["Home"], "the home list is the one that is shown")
         h.equal(root.titles(h), ["Recent one", "Recent two"], "and it still is")
         h.equal(h.actions(), [], "signing in fetched nothing")
@@ -227,12 +227,12 @@ QtObject {
           "Up from the first row reaches the chips, on the list shown")
         h.equal(root.highlighted(h), [], "and the row lets go")
         h.key(Qt.Key_Right)
-        h.equal(root.cursorButtons(h), ["History"], "Right: the next chip")
-        h.key(Qt.Key_Right)
-        h.equal(root.cursorButtons(h), ["History"], "which is the last")
+        h.equal(root.cursorButtons(h), ["Playlists"], "Right: it is the last chip")
+        h.key(Qt.Key_Left)
+        h.equal(root.cursorButtons(h), ["Watch later"], "Left: the chip before it")
         h.equal(h.actions(), [], "moving along the chips fetches nothing")
         h.key(Qt.Key_Return)
-        h.equal(h.calls("selectFeed"), [["history"]], "Enter asks for the chip's list")
+        h.equal(h.calls("selectFeed"), [["later"]], "Enter asks for the chip's list")
         h.resetCalls()
         for (var i = 0; i < 9; i++) h.key(Qt.Key_Left)
         h.equal(root.cursorButtons(h), ["Home"], "Left stops at the first chip")
@@ -245,13 +245,13 @@ QtObject {
 
         // ---- A list that holds nothing, and one that could not be read ----
         h.mock.feedTitle = ""
-        root.showFeed(h, "history", "empty", [], "")
+        root.showFeed(h, "later", "empty", [], "")
       },
       function() {
         h.check(!root.shown(h, "<i>My list</i>"), "a list of the account itself has no title above it")
         h.check(root.shown(h, "Nothing here yet"), "an empty list says so")
         h.equal(root.titles(h), [], "and shows no rows")
-        root.showFeed(h, "history", "error", [], "E_FEED")
+        root.showFeed(h, "later", "error", [], "E_FEED")
       },
       function() {
         h.check(root.shown(h, "text of E_FEED"), "a list that could not be read shows the service's sentence")

@@ -318,8 +318,9 @@ test("fromQt: no other key number gives a combination", function() {
 
 // ---- Actions ----
 
-test("actions: three, with constant texts that cannot be changed from outside", function() {
-  assert.deepStrictEqual(KeyCombo.ACTIONS.slice(), ["panel", "video", "output"])
+test("actions: six, with constant texts that cannot be changed from outside", function() {
+  assert.deepStrictEqual(KeyCombo.ACTIONS.slice(),
+    ["panel", "video", "output", "playPause", "next", "previous"])
   assert.ok(Object.isFrozen(KeyCombo.ACTIONS))
   assert.ok(Object.isFrozen(KeyCombo.LAYOUT_OPTIONS))
   KeyCombo.ACTIONS.forEach(function(name) {
@@ -347,7 +348,7 @@ test("actions: descriptions are comma-free, distinct, plain ASCII and carry the 
     // Short enough to be shown whole, and to survive the reader's cut.
     assert.ok(text.length <= 60, text)
   })
-  assert.strictEqual(new Set(texts).size, 6)
+  assert.strictEqual(new Set(texts).size, 12)
 })
 
 test("actions: every proposal is a combination, and none is offered for two actions", function() {
@@ -367,12 +368,15 @@ test("actions: every proposal is a combination, and none is offered for two acti
 
 test("command: the shell call of each action, made of constants and the plugin id", function() {
   assert.match(Const.PLUGIN_ID, /^[a-z0-9]+(\.[a-z0-9-]+)+$/)
-  var calls = { panel: "toggle", video: "video toggle", output: "output next" }
+  var calls = {
+    panel: "toggle", video: "video toggle", output: "output next", playPause: "playPause", next: "next",
+    previous: "previous"
+  }
   KeyCombo.ACTIONS.forEach(function(name) {
     var command = KeyCombo.command(name)
     assert.strictEqual(command, "omarchy-shell -q " + Const.PLUGIN_ID + " " + calls[name])
     // Nothing a shell would treat as more than words.
-    assert.match(command, /^[a-z0-9 .-]+$/)
+    assert.match(command, /^[A-Za-z0-9 .-]+$/)
   })
 })
 
@@ -401,7 +405,7 @@ test("copyLine: one line for the user's own configuration, in the usual spelling
       var line = KeyCombo.copyLine(name, combo)
       assert.strictEqual(line, "o.bind(\"" + combo + "\", \"" + KeyCombo.action(name).configDescription
         + "\", \"" + KeyCombo.command(name) + "\")")
-      assert.match(line, /^o\.bind\("[A-Z0-9 +]+", "[A-Za-z .()]+", "[a-z0-9 .-]+"\)$/)
+      assert.match(line, /^o\.bind\("[A-Z0-9 +]+", "[A-Za-z .()]+", "[A-Za-z0-9 .-]+"\)$/)
       assert.strictEqual(line.split("\"").length, 7)
     })
   })
@@ -666,11 +670,16 @@ test("fixture: proposals skip what is taken, ours already, or not confirmed", fu
   assert.strictEqual(KeyCombo.propose(listing.records, OTHER, "video"), "")
   assert.strictEqual(KeyCombo.propose(listing.records, US, "output"), "")
   assert.strictEqual(KeyCombo.propose(listing.records, OTHER, "output"), "")
+  // The later actions: K is in a submap and N is somebody else's, so only
+  // the Back key is offered where nothing of theirs is bound yet.
+  assert.strictEqual(KeyCombo.propose(listing.records, OTHER, "playPause"), "")
+  assert.strictEqual(KeyCombo.propose(listing.records, OTHER, "next"), "")
+  assert.strictEqual(KeyCombo.propose(listing.records, OTHER, "previous"), "SUPER + CTRL + ALT + B")
 
   // The same desktop before OmaJuke bound anything.
   var runtime = KeyCombo.ACTIONS.map(function(name) { return KeyCombo.action(name).description })
   var before = listing.records.filter(function(r) { return runtime.indexOf(r.description) === -1 })
-  assert.strictEqual(before.length, listing.records.length - 5)
+  assert.strictEqual(before.length, listing.records.length - 8)
   assert.strictEqual(KeyCombo.propose(before, US, "video"), "SUPER + CTRL + ALT + V")
   assert.strictEqual(KeyCombo.propose(before, OTHER, "video"), "SUPER + CTRL + ALT + V")
   assert.strictEqual(KeyCombo.propose(before, OTHER, "output"), "SUPER + CTRL + ALT + O")
@@ -681,6 +690,9 @@ test("fixture: the binds a user pasted are found, each for its own action", func
   assert.strictEqual(KeyCombo.findConfigured(listing.records, "panel"), "SUPER + CTRL + ALT + SHIFT + J")
   assert.strictEqual(KeyCombo.findConfigured(listing.records, "video"), "SUPER + CTRL + ALT + SHIFT + V")
   assert.strictEqual(KeyCombo.findConfigured(listing.records, "output"), "SUPER + CTRL + ALT + SHIFT + O")
+  assert.strictEqual(KeyCombo.findConfigured(listing.records, "playPause"), "SUPER + CTRL + ALT + SHIFT + K")
+  assert.strictEqual(KeyCombo.findConfigured(listing.records, "next"), "SUPER + CTRL + ALT + SHIFT + N")
+  assert.strictEqual(KeyCombo.findConfigured(listing.records, "previous"), "SUPER + CTRL + ALT + SHIFT + B")
 })
 
 test("fixture: the later format with a line of flag names gives the same verdicts", function() {

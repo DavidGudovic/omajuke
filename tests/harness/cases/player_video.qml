@@ -315,14 +315,23 @@ QtObject {
     root.player.addVideo(root.video, root.noted("add"))
     h.after(100, function() {
       h.scenario({ mpv: "slow-reply:150" })
+      var mark = root.lines().length
       root.player.readTracks(root.noted("tracks"))
-      root.load(3)
-      h.scenario({ mpv: "ok" })
-      root.until("the next track plays", root.plays(3), 5000, function() {
-        h.after(400, function() {
-          h.equal(root.answers, [], "neither answer reached its callback")
-          h.equal(root.facts(), [0, 0, false], "and the new file starts without video")
-          root.next()
+      // The stub holds an answer by the scenario it reads when it answers:
+      // only the question about the tracks is to be slow, so the next track
+      // is loaded once mpv has that question, not before.
+      var asked = function() {
+        return root.since(mark).indexOf("get_property track-list") !== -1
+      }
+      root.until("mpv has the question about the tracks", asked, 3000, function() {
+        h.scenario({ mpv: "ok" })
+        root.load(3)
+        root.until("the next track plays", root.plays(3), 5000, function() {
+          h.after(400, function() {
+            h.equal(root.answers, [], "neither answer reached its callback")
+            h.equal(root.facts(), [0, 0, false], "and the new file starts without video")
+            root.next()
+          })
         })
       })
     })

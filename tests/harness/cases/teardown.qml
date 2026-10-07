@@ -104,7 +104,24 @@ QtObject {
     h.scenario({ ytdlp: "hang", mpv: "ok", curl: "hang" })
     h.equal(s.submit("some words", false), "query", "a search is started")
     s.wantThumbs(["CCCCCCCCCCC"])
-    root.until("both tools hang", function() { return h.parts.runner.active === 2 }, 5000, root.next)
+    root.until("both tools hang", function() { return h.parts.runner.active === 2 }, 5000, function() {
+      root.toolsUp(100)
+    })
+  }
+
+  // The runner has started both tools some time before their stubs have
+  // written the files that say they run: waits for those, tries times at
+  // most, and goes on either way (before says what is missing).
+  function toolsUp(tries) {
+    var h = root.h
+    h.alive(function(alive) {
+      var up = alive.map(function(name) { return name.split(".")[0] })
+      if ((up.indexOf("curl") !== -1 && up.indexOf("ytdlp") !== -1) || tries <= 0) {
+        root.next()
+        return
+      }
+      h.after(50, function() { root.toolsUp(tries - 1) })
+    })
   }
 
   function before() {

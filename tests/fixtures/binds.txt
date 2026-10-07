@@ -1929,6 +1929,36 @@ bindd
 	arg: 192
 
 bindd
+	modmask: 77
+	submap: 
+	key: K
+	keycode: 0
+	catchall: false
+	description: OmaJuke playPause (bindings.lua)
+	dispatcher: __lua
+	arg: 193
+
+bindd
+	modmask: 77
+	submap: 
+	key: N
+	keycode: 0
+	catchall: false
+	description: OmaJuke next (bindings.lua)
+	dispatcher: __lua
+	arg: 194
+
+bindd
+	modmask: 77
+	submap: 
+	key: B
+	keycode: 0
+	catchall: false
+	description: OmaJuke previous (bindings.lua)
+	dispatcher: __lua
+	arg: 195
+
+bindd
 	modmask: 12
 	submap: 
 	key: Escape
@@ -1936,7 +1966,7 @@ bindd
 	catchall: false
 	description: Placeholder 188
 	dispatcher: __lua
-	arg: 193
+	arg: 196
 
 bindd
 	modmask: 12
@@ -1946,7 +1976,7 @@ bindd
 	catchall: false
 	description: Placeholder 189
 	dispatcher: __lua
-	arg: 194
+	arg: 197
 
 bindd
 	modmask: 12
@@ -1956,7 +1986,7 @@ bindd
 	catchall: false
 	description: Placeholder 190
 	dispatcher: __lua
-	arg: 195
+	arg: 198
 
 bindd
 	modmask: 12
@@ -1966,7 +1996,7 @@ bindd
 	catchall: false
 	description: Placeholder 191
 	dispatcher: __lua
-	arg: 196
+	arg: 199
 
 bindd
 	modmask: 12
@@ -1976,7 +2006,7 @@ bindd
 	catchall: false
 	description: Placeholder 192
 	dispatcher: __lua
-	arg: 197
+	arg: 200
 
 bindd
 	modmask: 8
@@ -1986,7 +2016,7 @@ bindd
 	catchall: false
 	description: Placeholder 193
 	dispatcher: __lua
-	arg: 198
+	arg: 201
 
 bindd
 	modmask: 8
@@ -1996,7 +2026,7 @@ bindd
 	catchall: false
 	description: Placeholder 194
 	dispatcher: __lua
-	arg: 199
+	arg: 202
 
 bindd
 	modmask: 8
@@ -2006,7 +2036,7 @@ bindd
 	catchall: false
 	description: Placeholder 195
 	dispatcher: __lua
-	arg: 200
+	arg: 203
 
 bindd
 	modmask: 8
@@ -2016,7 +2046,7 @@ bindd
 	catchall: false
 	description: Placeholder 196
 	dispatcher: __lua
-	arg: 201
+	arg: 204
 
 bindd
 	modmask: 8
@@ -2026,7 +2056,7 @@ bindd
 	catchall: false
 	description: Placeholder 197
 	dispatcher: __lua
-	arg: 202
+	arg: 205
 
 bindd
 	modmask: 9
@@ -2036,7 +2066,7 @@ bindd
 	catchall: false
 	description: Placeholder 198
 	dispatcher: __lua
-	arg: 203
+	arg: 206
 
 bindd
 	modmask: 9
@@ -2046,7 +2076,7 @@ bindd
 	catchall: false
 	description: Placeholder 199
 	dispatcher: __lua
-	arg: 204
+	arg: 207
 
 bindd
 	modmask: 4
@@ -2056,7 +2086,7 @@ bindd
 	catchall: false
 	description: Placeholder 200
 	dispatcher: __lua
-	arg: 205
+	arg: 208
 
 bindd
 	modmask: 4
@@ -2066,7 +2096,7 @@ bindd
 	catchall: false
 	description: Placeholder 201
 	dispatcher: __lua
-	arg: 206
+	arg: 209
 
 bindd
 	modmask: 4
@@ -2076,7 +2106,7 @@ bindd
 	catchall: false
 	description: Placeholder 202
 	dispatcher: __lua
-	arg: 207
+	arg: 210
 
 bindd
 	modmask: 4
@@ -2086,7 +2116,7 @@ bindd
 	catchall: false
 	description: Placeholder 203
 	dispatcher: __lua
-	arg: 208
+	arg: 211
 
 bindd
 	modmask: 5
@@ -2096,7 +2126,7 @@ bindd
 	catchall: false
 	description: Placeholder 204
 	dispatcher: __lua
-	arg: 209
+	arg: 212
 
 bind
 	modmask: 5
@@ -2106,7 +2136,7 @@ bind
 	catchall: false
 	description: 
 	dispatcher: __lua
-	arg: 210
+	arg: 213
 
 bindd
 	modmask: 13
@@ -2116,7 +2146,7 @@ bindd
 	catchall: false
 	description: Placeholder 205
 	dispatcher: __lua
-	arg: 211
+	arg: 214
 
 bind
 	modmask: 13
@@ -2226,7 +2256,7 @@ bindd
 	catchall: false
 	description: Placeholder 206
 	dispatcher: __lua
-	arg: 212
+	arg: 215
 
 bindd
 	modmask: 0
@@ -2236,7 +2266,7 @@ bindd
 	catchall: false
 	description: Placeholder 207
 	dispatcher: __lua
-	arg: 213
+	arg: 216
 
 bind
 	modmask: 0
@@ -2246,7 +2276,7 @@ bind
 	catchall: false
 	description: 
 	dispatcher: __lua
-	arg: 214
+	arg: 217
 
 bind
 	modmask: 0
@@ -2256,7 +2286,7 @@ bind
 	catchall: true
 	description: 
 	dispatcher: __lua
-	arg: 215
+	arg: 218
 
 bindd
 	modmask: 77
@@ -2266,7 +2296,7 @@ bindd
 	catchall: false
 	description: OmaJuke: open panel
 	dispatcher: __lua
-	arg: 216
+	arg: 219
 
 bindd
 	modmask: 76
@@ -2276,7 +2306,7 @@ bindd
 	catchall: false
 	description: OmaJuke: show or hide video
 	dispatcher: __lua
-	arg: 217
+	arg: 220
 
 bindd
 	modmask: 76
@@ -2286,7 +2316,7 @@ bindd
 	catchall: false
 	description: OmaJuke: next audio output
 	dispatcher: __lua
-	arg: 218
+	arg: 221
 
 bindd
 	modmask: 76
@@ -2296,7 +2326,7 @@ bindd
 	catchall: false
 	description: OmaJuke: next audio output
 	dispatcher: __lua
-	arg: 219
+	arg: 222
 
 bindd
 	modmask: 72
@@ -2306,6 +2336,36 @@ bindd
 	catchall: false
 	description: OmaJuke: next audio output
 	dispatcher: __lua
-	arg: 220
+	arg: 223
+
+bindd
+	modmask: 72
+	submap: 
+	key: K
+	keycode: 0
+	catchall: false
+	description: OmaJuke: play or pause
+	dispatcher: __lua
+	arg: 224
+
+bindd
+	modmask: 72
+	submap: 
+	key: N
+	keycode: 0
+	catchall: false
+	description: OmaJuke: next track
+	dispatcher: __lua
+	arg: 225
+
+bindd
+	modmask: 72
+	submap: 
+	key: B
+	keycode: 0
+	catchall: false
+	description: OmaJuke: previous track
+	dispatcher: __lua
+	arg: 226
 
 

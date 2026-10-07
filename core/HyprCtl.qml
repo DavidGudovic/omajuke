@@ -86,6 +86,12 @@ Item {
     })
   }
 
+  // True when the session names a Hyprland instance. Only the environment
+  // is read: nothing is started, so it may be asked at any time.
+  function hasSession(): bool {
+    return root._hasSession()
+  }
+
   // The error a gate result stands for, "" for "ok".
   function gateCode(found) {
     if (found === "ok") return ""

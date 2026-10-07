@@ -124,7 +124,11 @@ QtObject {
     h.equal([store.loaded, store.notice], [true, ""], "without a file the defaults stand at once")
     h.equal(store.values, {
       volume: 70, muted: false, proxyAck: false, prefs: {}, recents: [], queue: { items: [], index: -1 },
-      video: {}, shortcuts: { panel: "", video: "", output: "", dirty: false }, outputDevice: ""
+      video: {},
+      shortcuts: {
+        panel: "", video: "", output: "", playPause: "", next: "", previous: "", dirty: false, asked: false
+      },
+      outputDevice: ""
     }, "the complete default state")
     h.check(store.load() === false, "a second load is refused")
     h.after(1200, function() {

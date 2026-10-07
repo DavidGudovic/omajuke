@@ -220,7 +220,7 @@ var CASES = [
   { fn: "bind", args: [["MOD4 + V"], "video"], expect: "" },
   { fn: "bind", args: [{ alias: "MOD4 + V" }, "video"], expect: "" },
 
-  // ---- bind: an action that is not one of the three ----
+  // ---- bind: an action that is not one of the six ----
   { fn: "bind", args: ["MOD4 + V", "Video"], expect: "" },
   { fn: "bind", args: ["MOD4 + V", "videos"], expect: "" },
   { fn: "bind", args: ["MOD4 + V", "video "], expect: "" },
@@ -362,7 +362,7 @@ var CASES = [
   { fn: "check", args: [{ gen: "codes", codes: [104, 108, 46, 117, 110, 98, 105, 110, 100, 40, 56832] }],
     expect: false },
 
-  // ---- check: a bind that is not exactly one of the three ----
+  // ---- check: a bind that is not exactly one of the six ----
   { fn: "check", args: ["hl.bind(\"MOD4 + V\", hl.dsp.exec_cmd(\"x\"), " + _VIDEO], expect: false },
   { fn: "check", args: ["hl.bind(\"MOD4 + V\", " + _RUN + "video toggle; x\"), " + _VIDEO], expect: false },
   { fn: "check", args: ["hl.bind(\"MOD4 + V\", " + _RUN + "video toggle $(x)\"), " + _VIDEO],

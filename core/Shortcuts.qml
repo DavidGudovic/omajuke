@@ -6,8 +6,9 @@ import "../lib/Errors.js" as Errors
 import "../lib/KeyCombo.js" as KeyCombo
 import "../lib/Lua.js" as Lua
 
-// The keyboard shortcuts of the three actions (open the panel, show or hide
-// the video, next audio output). A shortcut is a key bind inside the
+// The keyboard shortcuts of the actions in KeyCombo.ACTIONS (open the panel,
+// show or hide the video, next audio output, play or pause, next and
+// previous track). A shortcut is a key bind inside the
 // compositor, made while it runs. So there are two truths: the combination
 // the user asked for, which is saved, and the binds the compositor really
 // holds, which only its own list shows. This component makes the second
@@ -68,6 +69,10 @@ Item {
   readonly property string gate: _gate
   // A pass is running.
   readonly property bool busy: _running
+  // Nobody has answered the question whether to turn shortcuts on, no
+  // action has one, and a yes is not being carried out: the panel may ask.
+  readonly property bool firstUse: root.store !== null && root.store.loaded === true && !root._keys().asked
+    && !root._anyCombo() && !root._suggest
 
   // ---- Private ----
 
@@ -76,6 +81,9 @@ Item {
   property bool _running: false
   // Something asked for a pass while one was running: one more follows.
   property bool _again: false
+  // The user asked for every proposal to be assigned: the next pass that
+  // reads a list saves them as wishes, and the pass after it binds them.
+  property bool _suggest: false
   property int _passes: 0
   // The combinations the last pass saw bound by us and by nobody else, in
   // its last list: what is taken back when the service ends. Emptied the
@@ -116,8 +124,7 @@ Item {
   // that was not confirmed. Returns true when a pass was started.
   function start() {
     root._showSaved("")
-    var keys = root._keys()
-    if (keys.panel === "" && keys.video === "" && keys.output === "" && !keys.dirty) return false
+    if (!root._anySaved()) return false
     if (!root._trigger()) return false
     // After a restart of the shell the instance before this one removes
     // its binds with a command that outlives it, and that removal can
@@ -144,6 +151,33 @@ Item {
     if (!root._save(action, parsed.canonical, true)) return false
     root._flush()
     return root._trigger()
+  }
+
+  // Assigns to every action without a shortcut the free combination its row
+  // proposes, as if the user had pressed Assign on each. A proposal is only
+  // known from a list read in a pass, so a pass runs first and the wishes
+  // are saved at its end; the pass after it makes the binds, each checked
+  // against a fresh list like any other. Two actions never get the same
+  // combination. Returns false when no pass can run.
+  function assignSuggested(): bool {
+    if (!root._usable()) return false
+    root._suggest = true
+    return root._trigger()
+  }
+
+  // The answer to the question whether to turn shortcuts on. No is final.
+  // Yes assigns the proposals, and is only final once a pass could make
+  // them: on a release the lines were not tried on, or while the
+  // configuration has errors, nothing is assigned and the question may come
+  // again.
+  function answerPrompt(enable: bool): bool {
+    if (!root._usable()) return false
+    if (enable === true) return root.assignSuggested()
+    var keys = root._keys()
+    keys.asked = true
+    if (root.store.patch({ shortcuts: keys }) !== true) return false
+    root._flush()
+    return true
   }
 
   // The user gives a shortcut up. The pass removes the bind where the list
@@ -188,33 +222,42 @@ Item {
     return root.hyprCtl !== null && root.store !== null
   }
 
-  // A copy of what is saved, each member by its name.
+  // A copy of what is saved: one member per action, by its name, and dirty.
   function _keys() {
     var values = root.store ? root.store.values : null
     var saved = values ? values.shortcuts : null
-    var text = function(value) { return typeof value === "string" ? value : "" }
-    return {
-      panel: saved ? text(saved.panel) : "",
-      video: saved ? text(saved.video) : "",
-      output: saved ? text(saved.output) : "",
-      dirty: saved ? saved.dirty === true : false
+    var keys = {}
+    for (var i = 0; i < KeyCombo.ACTIONS.length; i++) {
+      var value = saved ? saved[KeyCombo.ACTIONS[i]] : ""
+      keys[KeyCombo.ACTIONS[i]] = typeof value === "string" ? value : ""
     }
+    keys.dirty = saved ? saved.dirty === true : false
+    keys.asked = saved ? saved.asked === true : false
+    return keys
+  }
+
+  // Some action has a combination saved.
+  function _anyCombo() {
+    var keys = root._keys()
+    for (var i = 0; i < KeyCombo.ACTIONS.length; i++) {
+      if (keys[KeyCombo.ACTIONS[i]] !== "") return true
+    }
+    return false
+  }
+
+  // Some action has a combination saved, or a change was not confirmed.
+  function _anySaved() {
+    return root._anyCombo() || root._keys().dirty
   }
 
   function _desired(action) {
-    var keys = root._keys()
-    if (action === "panel") return keys.panel
-    if (action === "video") return keys.video
-    if (action === "output") return keys.output
-    return ""
+    return KeyCombo.ACTIONS.indexOf(action) !== -1 ? root._keys()[action] : ""
   }
 
   function _save(action, combo, dirty) {
+    if (KeyCombo.ACTIONS.indexOf(action) === -1) return false
     var keys = root._keys()
-    if (action === "panel") keys.panel = combo
-    else if (action === "video") keys.video = combo
-    else if (action === "output") keys.output = combo
-    else return false
+    keys[action] = combo
     if (dirty) keys.dirty = true
     return root.store !== null && root.store.patch({ shortcuts: keys }) === true
   }
@@ -276,6 +319,8 @@ Item {
     root.hyprCtl.gate(root._alive(function(found) {
       root._gate = found
       if (found === "no-hyprland") {
+        // A request to assign the proposals has nothing to assign on.
+        root._suggest = false
         root._showSaved("")
         root._end()
         return
@@ -291,6 +336,7 @@ Item {
             return
           }
           root._proven = []
+          root._suggest = false
           root._showSaved(root._unconfirmed)
           root._end()
         })
@@ -597,7 +643,33 @@ Item {
       keys.dirty = false
       root.store.patch({ shortcuts: keys })
     }
+    if (root._suggest) root._takeProposals(pass, listing, rows)
     root._end()
+  }
+
+  // Saves the proposals of the rows just made as wishes, and has one more
+  // pass follow to bind them. A pass that could only look, or a list that
+  // could not be read, proposes nothing: the request is dropped, the rows
+  // say why, and the first-use question stays unanswered.
+  function _takeProposals(pass, listing, rows) {
+    if (pass.readOnly || !listing.ok) {
+      root._suggest = false
+      return
+    }
+    // Kept before the request ends, so the question does not show between.
+    var keys = root._keys()
+    keys.asked = true
+    root.store.patch({ shortcuts: keys })
+    root._suggest = false
+    var taken = []
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i]
+      if (row.status !== "unassigned" || row.proposal === "" || taken.indexOf(row.proposal) !== -1) continue
+      if (root._desired(row.action) !== "") continue
+      if (root._save(row.action, row.proposal, true)) taken.push(row.proposal)
+    }
+    root._flush()
+    if (taken.length > 0) root._again = true
   }
 
   // ---- The end of the service ----
@@ -633,12 +705,7 @@ Item {
     interval: Const.TIMEOUTS.reloadMs
     // Somebody who never used a shortcut and never opened the page causes
     // no call to the compositor on a reload either.
-    onTriggered: {
-      var keys = root._keys()
-      if (root._passes > 0 || keys.panel !== "" || keys.video !== "" || keys.output !== "" || keys.dirty) {
-        root._trigger()
-      }
-    }
+    onTriggered: if (root._passes > 0 || root._anySaved()) root._trigger()
   }
 
   Timer {

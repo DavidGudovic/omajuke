@@ -2,7 +2,7 @@
 
 OmaJuke plays YouTube from the Omarchy bar. Click its icon, type a search, press Enter and pick a
 result: the audio plays through mpv and keeps playing after the panel is closed. No browser is
-opened and no account is needed. This is version 0.2.2.
+opened and no account is needed. This is version 0.3.0.
 
 ![The OmaJuke panel under its bar icon: search results, the playing track and the video window](preview.png)
 
@@ -10,9 +10,17 @@ opened and no account is needed. This is version 0.2.2.
 - Keeps a queue of up to 200 tracks and, with `autoplay` on, goes on with related tracks after it.
 - Is controlled from the panel, the bar icon, a command line and, with `mpv-mpris`, the media keys.
 - Shows the video in a small corner window when you ask for it. Without it only audio is fetched.
-- Offers three keyboard shortcuts that work anywhere on the desktop, none assigned until you assign it.
+- Offers six keyboard shortcuts that work anywhere on the desktop: play or pause, next, previous,
+  the video, the panel and the audio output. None is assigned until you say so; the panel asks
+  once.
 - Sends its sound to the audio output you choose, without changing the system default.
 - Remembers up to 30 recently played tracks and the queue. You can switch that off and clear both.
+
+The first minute: install it (see [Install](#install)), click the music icon on the bar, type a
+search and press Enter twice. The first Enter searches, the second plays the top result. Esc
+closes the panel and the music keeps going. On first use the panel also asks once whether to turn
+on keyboard shortcuts: **Turn on** gives every action a free key, such as Super+Ctrl+Alt+K for
+play or pause.
 
 Off until you switch them on, because each talks to someone new: **sign-in**, which shows the
 lists of your YouTube account, stores a login on your disk and puts that account at some risk
@@ -41,6 +49,7 @@ service.
 | Any Hyprland but 0.56.2 | The video window and the shortcuts are verified on 0.56.2 only. On any version that is not 0.56.x OmaJuke sends Hyprland nothing: there is no video window, and a shortcut can only be set up by hand (see [Shortcuts](#shortcuts)) |
 | Recording a key, losing an output, live streams | Recording a key of your own with **Change…** has not been tried on a real desktop. Losing the chosen audio output has been tested with made-up device lists, not by unplugging a device. Playing live streams has had little testing |
 | Three pages on a real screen | The queue, shortcuts and audio output pages were rendered off-screen by the automated tests, but have not been looked at on a real screen. The main page, the settings page and the signed-out account page have |
+| New in 0.3.0 | The three new shortcuts, the question that turns shortcuts on, the video window moving when you pick another corner or size, and the list chips scrolling sideways have passed the automated tests only. None of them has been tried on a real desktop yet |
 
 ## Requirements
 
@@ -79,7 +88,8 @@ process, and asks for confirmation. That is the moment to read the code.
 | Anything else that looks like a link, a network address or a file path | It is not sent anywhere, and the panel says so. A few searches are taken for links, such as `will.i.am`, `re:zero` or anything that starts with `/`. Put a word in front and it is a search again |
 | An empty field | The list shows what is queued after the playing track, and under it what you played recently. Emptying the field also drops the search results. A queued link is listed as `youtu.be/...` until its turn comes: a video is looked up only when it is about to play |
 | A click on a row | Plays it. A result or a recent track starts a new queue with that track alone. A queued track is jumped to, and the queue is kept. The small button on a row adds the track to the end of the queue, or takes a queued track out of it |
-| A notice above the list | Notices show one at a time, each with a button to dismiss or answer it: a video needs your account, a track was skipped, the chosen audio output is gone, the question about sponsor skipping. When autoplay finds no related tracks, nothing is said |
+| A notice above the list | Notices show one at a time, each with a button to dismiss or answer it: a video needs your account, a track was skipped, the chosen audio output is gone, the question about sponsor skipping, and on first use the question whether to turn shortcuts on. When autoplay finds no related tracks, nothing is said |
+| The list chips, while signed in | Home, For you, Subscriptions, Watch later and Playlists, on one line. Where the panel is too narrow for all of them, the line scrolls sideways: drag it, swipe, or turn the wheel over it. The chip with the keyboard highlight is always scrolled into view |
 
 | Key | While typing in the search field | After moving into the list |
 |---|---|---|
@@ -125,7 +135,7 @@ channel, and the controls below.
 | Queue | Opens the queue page: every track in order (200 at most), the playing one marked. Tracks can be played, removed and moved there, and **Clear queue** empties it after a confirmation, leaving the playing track. When a track starts, the one after it is looked up at YouTube ahead of time, so that the change has no gap. A track that cannot be played is skipped with `Skipped a track that could not be played`. When the failure is not about that one track, for example no network, playback stops instead. When the last track ends and `autoplay` is off, playback stops and the queue stays as it is |
 | Audio output | Opens a page with `System default` and the PipeWire outputs mpv reports. Picking one moves only OmaJuke's sound, and the choice is saved and applied before the first track of the next session. The list exists only while a track is loaded: otherwise the page shows the saved choice and says `Outputs are available while something is playing`. When the chosen output disappears, OmaJuke plays on the system default and says `That output is gone. Using the system default`. The choice is kept, and taken up again when the device comes back. The shortcut **Next audio output** and the IPC method `output next` step through the same list |
 | Video | Shows the picture of the playing track in mpv's own window, and hides it again. It needs Hyprland 0.56.x and a track that is playing or paused |
-| Video window: place | It floats in a corner of the monitor that has the focus, clear of the bar and the gaps, at 16:9. The settings `videoSize` and `videoCorner` say how wide and where. If you moved or resized it, OmaJuke notes on hiding or closing it which corner of the monitor it was nearest to and how wide it was, and opens it that way on that monitor next time |
+| Video window: place | It floats in a corner of the monitor that has the focus, clear of the bar and the gaps, at 16:9. The settings `videoSize` and `videoCorner` say how wide and where. Picking another size or corner moves a window that is open: it closes and opens again in the new place, a moment after your last pick, while the sound plays on. If you moved or resized it yourself, OmaJuke notes on hiding or closing it which corner of the monitor it was nearest to and how wide it was, and opens it that way on that monitor next time, until you pick a size or corner again |
 | Video window: stacking | It is pinned, so it follows you to every workspace, and it does not take the keyboard focus. It stays above tiled windows. Hyprland has no always-on-top for ordinary windows, so a floating window that you raise can cover it |
 | Video window: loading | The first picture takes a few seconds. The strip says `Loading video…` meanwhile, and gives up for that track after 20 seconds. A track without a usable video has no window, and the strip says `No video for this track`. Otherwise the window stays open from one track to the next |
 | Video window: hiding | With the same button, the shortcut, the IPC method `video hide` or Hyprland's own close-window key. The audio goes on in every case. While the window is hidden no video is fetched at all. Whether it is shown is not saved: a new session starts without it |
@@ -133,16 +143,24 @@ channel, and the controls below.
 
 ## Shortcuts
 
-OmaJuke can give three actions a key that works anywhere on the desktop. Nothing is bound until
-you press **Assign** on the shortcuts page, which is opened from the settings page. **Change…**
-records another combination: hold Super, Ctrl or Alt, with Shift if you like, and press a letter
-or one of F1 to F12. Esc cancels. **Unassign** removes the bind.
+OmaJuke can give six actions a key that works anywhere on the desktop. Nothing is bound until
+you ask. On first use the panel asks once: **Turn on** assigns to every action the first free key
+it proposes below and opens the shortcuts page, so you see what each got; **No thanks** leaves
+everything as it is. Either answer is final, and the question never comes back once any action
+has a key. The one exception: where the page cannot bind yet (an untested Hyprland release, or
+errors in your configuration), **Turn on** assigns nothing and the question comes back. The shortcuts page, opened from the settings page, does the same one action at a time:
+**Assign** takes the proposed key, **Change…** records another combination (hold Super, Ctrl or
+Alt, with Shift if you like, and press a letter or one of F1 to F12; Esc cancels), and
+**Unassign** removes the bind.
 
 | Action | What the key runs | Keys it proposes, the first free one | Shown in `hyprctl binds` as |
 |---|---|---|---|
 | Open panel | `omarchy-shell -q davidgudovic.omajuke toggle` | Super+Ctrl+Alt+J, Super+Alt+J, Super+Ctrl+Alt+P | `OmaJuke: open panel` |
 | Show or hide video | `omarchy-shell -q davidgudovic.omajuke video toggle` | Super+Ctrl+Alt+V, Super+Alt+V | `OmaJuke: show or hide video` |
 | Next audio output | `omarchy-shell -q davidgudovic.omajuke output next` | Super+Ctrl+Alt+O, Super+Alt+O | `OmaJuke: next audio output` |
+| Play or pause | `omarchy-shell -q davidgudovic.omajuke playPause` | Super+Ctrl+Alt+K, Super+Alt+K | `OmaJuke: play or pause` |
+| Next track | `omarchy-shell -q davidgudovic.omajuke next` | Super+Ctrl+Alt+N, Super+Alt+N | `OmaJuke: next track` |
+| Previous track | `omarchy-shell -q davidgudovic.omajuke previous` | Super+Ctrl+Alt+B, Super+Alt+B | `OmaJuke: previous track` |
 
 A shortcut is a bind inside the running Hyprland, made by handing Hyprland one fixed line through
 `hyprctl eval`. It is not written into your Hyprland configuration: OmaJuke never writes under
@@ -183,8 +201,8 @@ o.bind("SUPER + CTRL + ALT + V", "OmaJuke video (bindings.lua)", "omarchy-shell 
 | `evenVolume` | Even out volume | off | Plays quiet and loud tracks at a similar level, with mpv's `dynaudnorm` audio filter. It applies to the playing track at once |
 | `sponsorSkip` | Skip sponsor segments | ask | `on`: for every track that starts, one question goes to sponsor.ajay.app, and the sponsor, self-promotion and interaction-reminder segments it knows are jumped over. While the video window is hidden, non-music parts of music videos are skipped too. `off`: no request. `ask`: no request either; from the first track that plays, the panel asks once, and shows the question until you answer it |
 | `maxHeight` | Video quality | 720 | The highest resolution the video window asks for: 480, 720 or 1080. It applies to tracks that are looked up after the change |
-| `videoSize` | Video size | quarter | Width of the video window as a share of the monitor's width: `sixth`, `quarter`, `third` or `half` |
-| `videoCorner` | Video corner | bottom-right | Where the video window appears: `top-left`, `top-right`, `bottom-left` or `bottom-right` |
+| `videoSize` | Video size | quarter | Width of the video window as a share of the monitor's width: `sixth`, `quarter`, `third` or `half`. Picking one on the settings page moves a window that is open, and forgets where you left the window on every monitor |
+| `videoCorner` | Video corner | bottom-right | Where the video window appears: `top-left`, `top-right`, `bottom-left` or `bottom-right`. Picking one on the settings page moves a window that is open, and forgets where you left the window on every monitor |
 | `keepAwake` | Keep the screen awake | on | While the video window is visible and playing, the screen does not go idle. Audio alone never keeps it awake |
 | `markWatched` | Add plays to YouTube history | off | Only while signed in, and the row is only shown then. When a track has been playing for 30 seconds, YouTube is told that your account watched it. Time spent paused or loading does not count, and nothing is reported for a track that was only looked up |
 | `rememberHistory` | Remember history | on | Keeps the recently played list and the queue in `state.json` between sessions. When it is off, nothing about what you play is written to disk, and the lists last until the shell exits. Switching it off rewrites the file at once without them. Switching it back on saves the lists as they stand then, including what you played while it was off |
@@ -232,7 +250,7 @@ now: it is still starting, a tool it needs is missing, or the proxy notice has n
 2048 characters or has a control character in it. `status` answers one JSON object:
 
 ```json
-{ "version": "0.2.2", "state": "playing", "id": "AAAAAAAAAAA", "title": "Example title",
+{ "version": "0.3.0", "state": "playing", "id": "AAAAAAAAAAA", "title": "Example title",
   "channel": "Example channel", "position": 37.2, "duration": 213, "live": false, "volume": 70,
   "muted": false, "queueLength": 3, "queueIndex": 0, "video": "hidden", "output": "",
   "signedIn": false, "updatePending": false, "error": "" }
@@ -292,7 +310,7 @@ contacts what it contacts, and the last row of the first table is not OmaJuke's 
 
 | Path | Mode | What is in it | How long |
 |---|---|---|---|
-| `~/.local/state/omajuke/state.json`, or `$XDG_STATE_HOME/omajuke/state.json` if that variable is set | Folder 0700, file 0600 | Volume and mute, whether you answered the proxy notice, a copy of three privacy choices, the shortcuts you assigned, the audio output you chose, where you left the video window and, while `rememberHistory` is on, the recently played list and the queue | Until you delete it |
+| `~/.local/state/omajuke/state.json`, or `$XDG_STATE_HOME/omajuke/state.json` if that variable is set | Folder 0700, file 0600 | Volume and mute, whether you answered the proxy notice, a copy of three privacy choices, the shortcuts you assigned and whether you answered the question about them, the audio output you chose, where you left the video window and, while `rememberHistory` is on, the recently played list and the queue | Until you delete it |
 | `~/.local/share/omajuke/`, or `$XDG_DATA_HOME/omajuke/` if that variable is set | Folder 0700 | Nothing, unless you sign in. The folder is created when the shell starts | Until you delete it |
 | `cookies.txt` in it | 0600 | The saved login: the cookies YouTube set in the sign-in window. Whoever can read this file can use your YouTube account | From a sign-in until you sign out, or until OmaJuke is disabled or removed |
 | `$XDG_RUNTIME_DIR/omajuke/`, normally `/run/user/<uid>/omajuke/`, which is in memory | Folder 0700 | The entries below | Emptied when OmaJuke is disabled or removed, and normally when the shell exits. Gone at logout, at the latest at reboot |
@@ -330,7 +348,7 @@ bugs. Qt may add a warning of its own about the socket or a file, one reason fil
 ## Sign-in
 
 Nobody has to sign in: everything else on this page works without an account. Signing in adds
-the lists of your YouTube account (For you, Subscriptions, Watch later, Playlists and History),
+the lists of your YouTube account (For you, Subscriptions, Watch later and Playlists),
 `markWatched` if you switch it on, and playing a video that YouTube shows to signed-in users only.
 
 **The risk.** YouTube does not offer this kind of access. OmaJuke uses the login the way a

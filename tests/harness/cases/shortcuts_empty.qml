@@ -42,7 +42,10 @@ QtObject {
   }
 
   function wishes(panel, video, output, dirty) {
-    return { panel: panel, video: video, output: output, dirty: dirty }
+    return {
+      panel: panel, video: video, output: output, playPause: "", next: "", previous: "", dirty: dirty,
+      asked: false
+    }
   }
 
   // Every bind the stub's table holds, as "<modmask> <key> <description>".

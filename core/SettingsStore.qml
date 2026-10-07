@@ -48,6 +48,10 @@ Item {
   // over the entry, so a toggle does not flicker back while the host is
   // still writing its file.
   property var _pending: Object.create(null)
+  // The earlier changes of each pending key, sent before the one pending
+  // now. A snapshot that shows one of them is the host catching up, not
+  // somebody else changing the setting (Settings.unsettled).
+  property var _sent: Object.create(null)
   property bool _scheduled: false
   // Shared with every deferred call, so that none of them runs into a
   // store that is already being destroyed.
@@ -75,6 +79,7 @@ Item {
     root._announce(Settings.overlay(root._raw, pending))
     // From here on the setting reads its new value, whenever the host
     // gets round to showing it.
+    root._sent = Settings.earlierSent(root._sent, root._pending, key)
     root._pending = pending
     facade.updateEntryInline(root.pluginId, entry)
     return true
@@ -106,7 +111,9 @@ Item {
     var before = root._raw
     root._rawText = text
     root._raw = found
-    var left = Settings.unsettled(root._pending, found, before)
+    var left = Settings.unsettled(root._pending, found, before, root._sent)
+    // The changes the entry has now shown are behind the host.
+    root._sent = Settings.earlierSent(Settings.echoed(root._sent, found), left, "")
     if (Object.keys(left).length !== Object.keys(root._pending).length) root._pending = left
     root._schedule()
   }

@@ -136,6 +136,10 @@ issue form of `omacom/omarchy-plugin-marketplace` (category `Widgets`, tags `med
 - Recording a key with "Change…" and Shift+Enter have not been pressed on a real desktop.
 - Losing the chosen audio output, a live stream, a second monitor, keep-awake.
 - A "Play with my account" answer was never checked for stray cookies in what is saved.
+- New in 0.3.0 and run only against stand-ins: the play/pause, next and previous shortcuts, the
+  first-use question and its **Turn on**, the video window moving when its corner or size is
+  picked (whether mpv really closes and reopens its window there), and the list chips scrolling
+  sideways under the mouse wheel.
 - The video window and shortcuts are verified on Hyprland 0.56.2 only. Other 0.56.x versions pass
   the version gate without having been tried, and every other version is refused until someone
   tests it and extends `TESTED` in `lib/Lua.js`.

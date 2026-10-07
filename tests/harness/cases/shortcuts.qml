@@ -61,7 +61,10 @@ QtObject {
   }
 
   function wishes(panel, video, output, dirty) {
-    return { panel: panel, video: video, output: output, dirty: dirty }
+    return {
+      panel: panel, video: video, output: output, playPause: "", next: "", previous: "", dirty: dirty,
+      asked: false
+    }
   }
 
   // Somebody who never asked for a shortcut costs the compositor nothing.
@@ -78,8 +81,11 @@ QtObject {
       }), [
         ["panel", "Open panel", "", "unassigned", "", ""],
         ["video", "Show or hide video", "", "unassigned", "", ""],
-        ["output", "Next audio output", "", "unassigned", "", ""]
-      ], "quiet: three rows without a shortcut")
+        ["output", "Next audio output", "", "unassigned", "", ""],
+        ["playPause", "Play or pause", "", "unassigned", "", ""],
+        ["next", "Next track", "", "unassigned", "", ""],
+        ["previous", "Previous track", "", "unassigned", "", ""]
+      ], "quiet: six rows without a shortcut")
       h.equal([parts.keys.gate, parts.keys.busy], ["ok", false],
         "quiet: nothing stands in the way, nothing runs")
       root.next()
@@ -100,7 +106,9 @@ QtObject {
         .map(function(entry) { return entry.argv[2] }), KeyCombo.LAYOUT_OPTIONS,
         "opened: the four options that say which letter a key number types")
       h.equal(parts.keys.rows.map(function(row) { return [row.status, row.proposal] }),
-        [["unassigned", root.j2], ["unassigned", root.v1], ["unassigned", root.o1]],
+        [["unassigned", root.j2], ["unassigned", root.v1], ["unassigned", root.o1],
+          ["unassigned", "SUPER + CTRL + ALT + K"], ["unassigned", "SUPER + CTRL + ALT + N"],
+          ["unassigned", "SUPER + CTRL + ALT + B"]],
         "opened: each action is offered its first combination that is free")
       h.equal(parts.store.patches.length, 0, "opened: nothing is saved by looking")
       root.next()
