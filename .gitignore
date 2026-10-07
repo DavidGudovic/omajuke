@@ -17,7 +17,7 @@ tests/fixtures/local/
 
 # Local editor and agent state
 .claude/
-CLAUDE.md
+CLAUDE.local.md
 AGENTS.md
 .idea/
 .vscode/

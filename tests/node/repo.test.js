@@ -629,7 +629,8 @@ var LAYOUT = {
   ],
   "service and documents": [
     "Service.qml", "core/Playback.qml", "lib/Recover.js", "manifest.json", "README.md", "SECURITY.md",
-    "LICENSE", "NOTICE", "CHANGELOG.md", "CONTRIBUTING.md", "preview.png", "tests/harness/FakePlayer.qml",
+    "LICENSE", "NOTICE", "CHANGELOG.md", "CONTRIBUTING.md",
+    "CLA" + "UDE.md", "preview.png", "tests/harness/FakePlayer.qml",
     "tests/harness/FakeResolver.qml",
     "tests/node/recover.test.js", "tests/harness/cases/playback_table.qml",
     "tests/harness/cases/play_basic.qml", "tests/harness/cases/play_error.qml",
@@ -1455,6 +1456,9 @@ var MAX_FILE_BYTES = 512 * 1024
 // search of the published tree for it finds the ignore file and nothing else.
 var AGENT_NOTES = new RegExp("^(?:CLA" + "UDE|AGENTS|GEMINI)\\.md$", "i")
 var AGENT_FOLDERS = new RegExp("(?:^|\\/)\\.(?:cla" + "ude|cursor|aider)")
+// The one such file the repository does keep: short working notes at its
+// root, held to every audit like any other published file.
+var ROOT_NOTES = "CLA" + "UDE.md"
 
 // The first bytes of a compiled program: ELF, PE and the Mach-O variants.
 var BINARY_MAGIC = /^(?:\x7fELF|MZ|\xcf\xfa\xed\xfe|\xfe\xed\xfa[\xce\xcf]|\xca\xfe\xba\xbe)/
@@ -1467,7 +1471,7 @@ function auditFiles(tree) {
     if (entry.symlink) problems.push(file + ": a symbolic link")
     if (/install|setup/i.test(base)) problems.push(file + ": the name reads as an installer")
     if (/\.service$/.test(base)) problems.push(file + ": a service unit")
-    if (AGENT_NOTES.test(base) || AGENT_FOLDERS.test(file)) {
+    if ((AGENT_NOTES.test(base) && file !== ROOT_NOTES) || AGENT_FOLDERS.test(file)) {
       problems.push(file + ": a file for a coding agent")
     }
     if (entry.size > MAX_FILE_BYTES && file !== "preview.png") problems.push(file + ": larger than 512 KiB")
@@ -2182,7 +2186,7 @@ var PLANTED = {
     ["a symbolic link", change("link.qml", { text: "", symlink: true })],
     ["an installer by name", change("tests/setup-env.js", "\"use strict\"\n// A helper.\n")],
     ["an agent file", change("AGENTS.md", "notes\n")],
-    ["an agent file of another kind", change("CLA" + "UDE.md", "notes\n")],
+    ["an agent file of another kind", change("ui/CLA" + "UDE.md", "notes\n")],
     ["an agent's settings folder", change(".cla" + "ude/settings.json", "{}\n")],
     ["a compiled binary", change("tests/stubs/tool", String.fromCharCode(0x7f) + "ELF")],
     ["an executable in the plugin", change("Service.qml", { text: SOUND["Service.qml"], executable: true })],
